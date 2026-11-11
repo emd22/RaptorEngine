@@ -10,6 +10,7 @@
 #include "Target.hpp"
 
 #include <Core/Log.hpp>
+#include <Renderer/Limits.hpp>
 #include <Renderer/Globals.hpp>
 #include <Texture/TextureManager.hpp>
 #include <algorithm>
@@ -26,11 +27,17 @@ constexpr uint32 scLogInterval = 120;
 
 constexpr uint32 scJobReset = 0x80000000U;
 constexpr uint32 scJobLevelShift = 28;
+constexpr uint32 scJobDirtyShift = 24;
+/// Share of the budget left after the new probes that the dirty ones may take, so the rest keep being refreshed
+constexpr uint32 scDirtyBudgetNumerator = 3;
+constexpr uint32 scDirtyBudgetDenominator = 4;
 constexpr uint32 scStateValid = 0x01;
 
 /// A slot traced for the first time this frame still holds the probe it had before until the blend, so it counts
 /// as unfilled for this frame's reads
 constexpr uint8 scPending = 2;
+/// A slot whose grid point the map's probe mask rules out. It is never traced and reads as unfilled.
+constexpr uint8 scDead = 3;
 
 /// Mirror CLIPMAP_FLAG_* in Shaders/ProbeClipmapConsts.hlsli
 constexpr uint32 scFlagBounce = 0x01;
@@ -44,6 +51,8 @@ constexpr uint32 scStatBlack = 3;
 constexpr uint32 scStatBackfaces = 4;
 constexpr uint32 scStatInactive = 5;
 constexpr uint32 scStatMoved = 6;
+constexpr uint32 scStatLight = 7;
+constexpr float64 scStatLightScale = 4.0;
 constexpr uint32 scStatCount = 8;
 constexpr float64 scStatChangeScale = 10000.0;
 
@@ -64,6 +73,9 @@ struct ProbeClipmapConsts
 	uint32 Info[4] = {};
 	/// Hysteresis, fast hysteresis, change threshold, moment sharpness
 	float32 Blend[4] = {};
+	/// Per level, how many times less often its probes are refreshed than the hysteresis is meant for. The fourth is
+	/// the dirty hysteresis.
+	float32 LevelRate[4] = {};
 	float32 SkyRadiance[4] = {};
 };
 
@@ -92,7 +104,7 @@ constexpr uint32 scForwardFlagBakedSun = 0x01;
 
 static_assert(sizeof(ProbeClipmapForwardData) <= ProbeClipmap::scForwardDataFrameSize);
 static_assert(sizeof(ProbeClipmapLevelGpu) == 32);
-static_assert(sizeof(ProbeClipmapConsts) == 192 + 96 + 64 + 80 + 16 * 5);
+static_assert(sizeof(ProbeClipmapConsts) == 192 + 96 + 64 + 80 + 16 * 6);
 static_assert(sizeof(ProbeClipmapDebugConsts) == 96 + 64 + 16 * 3);
 
 /// Mirrors SHADE_FLAG_BAKED_SUN in Shaders/SDFPageShade.hlsli
@@ -101,6 +113,14 @@ constexpr uint32 scShadeFlagBakedSun = 0x01;
 int32 FloorDiv(float32 value, float32 size) { return static_cast<int32>(std::floor(value / size)); }
 
 int32 PositiveMod(int32 value, int32 size) { return ((value % size) + size) % size; }
+
+/// How many dirty updates a change of `strength` in (0, 1] is worth
+uint8 DirtyUpdates(float32 strength)
+{
+	const float32 full = static_cast<float32>(ProbeClipmap::scDirtyUpdates);
+
+	return static_cast<uint8>(std::clamp(std::ceil(strength * full), 1.0f, full));
+}
 
 /// The probe a slot holds while its level's window starts at `origin`, see ClipmapSlotProbe
 void SlotProbe(uint32 slot, const int32 origin[3], int32 out_probe[3])
@@ -229,12 +249,16 @@ void ProbeClipmap::Create()
 
 		level.Spacing = scLevel0Spacing * static_cast<float32>(1U << level_index);
 		level.Valid.InitSize(scProbesPerLevel, 0);
+		level.Dirty.InitSize(scProbesPerLevel, 0);
+		level.JobStamp.InitSize(scProbesPerLevel, 0);
 
 		const uint32 moments_size = (level_index == 0) ? scMomentsSize0 : scMomentsSize;
 
 		mpIrradiance[level_index] = CreateTileImage(scIrradianceSize + 2, eImageFormat::RGBA16_Float);
 		mpMoments[level_index] = CreateTileImage(moments_size + 2, eImageFormat::RG16_Float);
 	}
+
+	mTrackedLights.InitCapacity(Limits::MaxActiveLights);
 
 	mJobs.Create(eGpuBufferType::Storage, static_cast<uint64>(scMaxJobsPerFrame) * sizeof(uint32) * FramesInFlight,
 				 VMA_MEMORY_USAGE_CPU_TO_GPU, eGpuBufferFlags::PersistentMapped);
@@ -369,11 +393,286 @@ void ProbeClipmap::Reset()
 		level.bPlaced = false;
 		level.Cursor = 0;
 		level.InvalidCount = scProbesPerLevel;
+		level.DirtyCount = 0;
+		level.DirtyCursor = 0;
 
 		for (uint32 slot = 0; slot < scProbesPerLevel; slot++) {
 			level.Valid[slot] = 0;
+			level.Dirty[slot] = 0;
 		}
 	}
+
+	mTrackedLights.Clear();
+	mbHasTrackedLights = false;
+}
+
+void ProbeClipmap::SetProbeMask(const CompiledMapProbeMask& mask)
+{
+	mMask = CompiledMapProbeMask {};
+
+	if (mask.IsEmpty()) {
+		return;
+	}
+
+	for (uint32 level_index = 0; level_index < scLevelCount && level_index < mask.Levels.Size; level_index++) {
+		if (std::abs(mask.Levels[level_index].Spacing - mLevels[level_index].Spacing) > 1e-4f) {
+			LogWarning(LC_RENDER, "The map's GI probe mask was built for other probe spacings, ignoring it");
+			return;
+		}
+	}
+
+	mMask.bOutsideDead = mask.bOutsideDead;
+	mMask.Levels.InitSize(mask.Levels.Size);
+	mMask.Words.InitSize(mask.Words.Size);
+
+	memcpy(mMask.Levels.pData, mask.Levels.pData, mask.Levels.Size * sizeof(CompiledMapProbeMaskLevel));
+	memcpy(mMask.Words.pData, mask.Words.pData, mask.Words.Size * sizeof(uint32));
+}
+
+void ProbeClipmap::ClassifyLevel(uint32 level_index)
+{
+	if (!mbMaskInUse || mMask.IsEmpty()) {
+		return;
+	}
+
+	Level& level = mLevels[level_index];
+
+	for (uint32 slot = 0; slot < scProbesPerLevel; slot++) {
+		if (level.Valid[slot] != 0) {
+			continue;
+		}
+
+		int32 probe[3];
+		SlotProbe(slot, level.Origin, probe);
+
+		if (!mMask.IsAlive(level_index, probe)) {
+			level.Valid[slot] = scDead;
+			level.InvalidCount--;
+		}
+	}
+}
+
+void ProbeClipmap::SetDirty(Level& level, uint32 slot, uint8 value)
+{
+	if (level.Dirty[slot] == 0 && value != 0) {
+		level.DirtyCount++;
+	}
+	else if (level.Dirty[slot] != 0 && value == 0) {
+		level.DirtyCount--;
+	}
+
+	level.Dirty[slot] = value;
+}
+
+void ProbeClipmap::MarkDirty(const FVec3& center, float32 radius, float32 strength)
+{
+	const uint8 updates = DirtyUpdates(strength);
+
+	const int32 grid[3] = { scGridX, scGridY, scGridZ };
+	const float32 position[3] = { center.X, center.Y, center.Z };
+
+	for (Level& level : mLevels) {
+		if (!level.bPlaced) {
+			continue;
+		}
+
+		// A probe just outside the light still sees what it lights
+		const float32 reach = radius + level.Spacing;
+
+		int32 first[3];
+		int32 last[3];
+		bool is_empty = false;
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			first[axis] = std::max(FloorDiv(position[axis] - reach, level.Spacing), level.Origin[axis]);
+			last[axis] = std::min(FloorDiv(position[axis] + reach, level.Spacing) + 1, level.Origin[axis] + grid[axis] - 1);
+			is_empty = is_empty || (first[axis] > last[axis]);
+		}
+
+		if (is_empty) {
+			continue;
+		}
+
+		for (int32 z = first[2]; z <= last[2]; z++) {
+			for (int32 y = first[1]; y <= last[1]; y++) {
+				for (int32 x = first[0]; x <= last[0]; x++) {
+					const FVec3 probe(static_cast<float32>(x) * level.Spacing, static_cast<float32>(y) * level.Spacing,
+									  static_cast<float32>(z) * level.Spacing);
+
+					if (probe.DistanceTo(center) > reach) {
+						continue;
+					}
+
+					const uint32 slot = static_cast<uint32>(PositiveMod(x, scGridX) + PositiveMod(y, scGridY) * scGridX +
+															PositiveMod(z, scGridZ) * scGridX * scGridY);
+
+					// Unfilled probes are traced from nothing anyway
+					if (level.Valid[slot] != 0 && level.Valid[slot] != scDead && level.Dirty[slot] < updates) {
+						SetDirty(level, slot, updates);
+					}
+				}
+			}
+		}
+	}
+}
+
+void ProbeClipmap::MarkAllDirty(float32 strength)
+{
+	const uint8 updates = DirtyUpdates(strength);
+
+	for (Level& level : mLevels) {
+		for (uint32 slot = 0; slot < scProbesPerLevel; slot++) {
+			if (level.Valid[slot] != 0 && level.Valid[slot] != scDead && level.Dirty[slot] < updates) {
+				SetDirty(level, slot, updates);
+			}
+		}
+	}
+}
+
+void ProbeClipmap::MarkLightDirty(const TrackedLight& light, float32 strength)
+{
+	if (light.bDirectional) {
+		MarkAllDirty(strength);
+	}
+	else {
+		MarkDirty(light.Position, light.Radius, strength);
+	}
+}
+
+void ProbeClipmap::TrackLights(const SizedArray<ShadeLightCandidate>& lights)
+{
+	// A light that moved this much of its radius, turned this far (radians), or changed its intensity by all of it
+	// counts as fully changed
+	constexpr float32 scFullMove = 0.1f;
+	constexpr float32 scFullTurn = 0.35f;
+	/// Less than this is rounding
+	constexpr float32 scMinChange = 1e-3f;
+
+	// The first lights after a reset light probes that have not been traced yet, so there is nothing to compare
+	if (mbHasTrackedLights) {
+		for (const ShadeLightCandidate& light : lights) {
+			const TrackedLight* previous = nullptr;
+
+			for (const TrackedLight& tracked : mTrackedLights) {
+				if (tracked.ID == light.ID) {
+					previous = &tracked;
+					break;
+				}
+			}
+
+			TrackedLight current;
+			current.bDirectional = light.bDirectional;
+			current.Position = light.Position;
+			current.Radius = light.Radius;
+
+			if (previous == nullptr) {
+				MarkLightDirty(current, 1.0f);
+				continue;
+			}
+
+			float32 change = 0.0f;
+
+			// Small angles are taken from the distance between the unit vectors. An arc cosine of their dot product
+			// reads rounding error as a turn of a few ten thousandths, every frame.
+			if (light.bDirectional) {
+				// Its position is the direction towards it
+				change += (light.Position.Normalize() - previous->Position.Normalize()).Length() / scFullTurn;
+			}
+			else {
+				change += light.Position.DistanceTo(previous->Position) / std::max(light.Radius * scFullMove, 1e-3f);
+				change += std::abs(light.Radius - previous->Radius) /
+						  std::max(std::max(light.Radius, previous->Radius), 1e-3f);
+
+				// A quaternion and its negative are the same rotation
+				float32 same_sq = 0.0f;
+				float32 negated_sq = 0.0f;
+
+				for (uint32 lane = 0; lane < 4; lane++) {
+					const float32 difference = light.Rotation[lane] - previous->Rotation[lane];
+					const float32 sum = light.Rotation[lane] + previous->Rotation[lane];
+
+					same_sq += difference * difference;
+					negated_sq += sum * sum;
+				}
+
+				change += 2.0f * std::sqrt(std::min(same_sq, negated_sq)) / scFullTurn;
+			}
+
+			change += std::abs(light.Intensity - previous->Intensity) /
+					  std::max(std::max(light.Intensity, previous->Intensity), 1e-6f);
+
+			if (light.Color != previous->Color) {
+				change += 1.0f;
+			}
+
+			if (change > scMinChange) {
+				// Where it was as well as where it is now
+				MarkLightDirty(*previous, std::min(change, 1.0f));
+				MarkLightDirty(current, std::min(change, 1.0f));
+			}
+		}
+
+		// Lights that are gone
+		for (const TrackedLight& tracked : mTrackedLights) {
+			bool is_present = false;
+
+			for (const ShadeLightCandidate& light : lights) {
+				is_present = is_present || (light.ID == tracked.ID);
+			}
+
+			if (!is_present) {
+				MarkLightDirty(tracked, 1.0f);
+			}
+		}
+	}
+
+	mTrackedLights.Clear();
+
+	for (const ShadeLightCandidate& light : lights) {
+		if (mTrackedLights.Size >= mTrackedLights.Capacity) {
+			break;
+		}
+
+		TrackedLight tracked;
+		tracked.ID = light.ID;
+		tracked.bDirectional = light.bDirectional;
+		tracked.Position = light.Position;
+		tracked.Radius = light.Radius;
+		memcpy(tracked.Rotation, light.Rotation, sizeof(tracked.Rotation));
+		tracked.Intensity = light.Intensity;
+		tracked.Color = light.Color;
+
+		mTrackedLights.Insert(std::move(tracked));
+	}
+
+	mbHasTrackedLights = true;
+}
+
+uint32 ProbeClipmap::ScheduleDirtyJobs(uint32 level_index, uint32* jobs, uint32 job_count, uint32 limit)
+{
+	Level& level = mLevels[level_index];
+
+	for (uint32 index = 0; index < scProbesPerLevel && level.DirtyCount > 0 && job_count < limit; index++) {
+		const uint32 slot = level.DirtyCursor;
+		level.DirtyCursor = (level.DirtyCursor + 1) % scProbesPerLevel;
+
+		const uint8 dirty = level.Dirty[slot];
+
+		if (dirty == 0 || level.JobStamp[slot] == mUpdateCount) {
+			continue;
+		}
+
+		if (level.Valid[slot] != 1) {
+			SetDirty(level, slot, 0);
+			continue;
+		}
+
+		jobs[job_count++] = slot | (level_index << scJobLevelShift) | (static_cast<uint32>(dirty) << scJobDirtyShift);
+		level.JobStamp[slot] = mUpdateCount;
+		SetDirty(level, slot, dirty - 1);
+	}
+
+	return job_count;
 }
 
 void ProbeClipmap::PlaceLevel(uint32 level_index, const FVec3& center)
@@ -406,6 +705,7 @@ void ProbeClipmap::PlaceLevel(uint32 level_index, const FVec3& center)
 			if (!same && level.Valid[slot] != 0) {
 				level.Valid[slot] = 0;
 				level.InvalidCount++;
+				SetDirty(level, slot, 0);
 			}
 		}
 	}
@@ -414,6 +714,8 @@ void ProbeClipmap::PlaceLevel(uint32 level_index, const FVec3& center)
 	level.Origin[1] = origin[1];
 	level.Origin[2] = origin[2];
 	level.bPlaced = true;
+
+	ClassifyLevel(level_index);
 }
 
 uint32 ProbeClipmap::ScheduleJobs(uint32* jobs, const Settings& settings)
@@ -433,11 +735,9 @@ uint32 ProbeClipmap::ScheduleJobs(uint32* jobs, const Settings& settings)
 			jobs[job_count++] = slot | (level_index << scJobLevelShift) | scJobReset;
 			level.Valid[slot] = scPending;
 			level.InvalidCount--;
+			level.JobStamp[slot] = mUpdateCount;
 		}
 	}
-
-	// The rest of the budget refreshes the oldest probes, round robin, shared between the levels
-	const uint32 remaining = budget - job_count;
 
 	uint32 share_total = 0;
 
@@ -445,19 +745,45 @@ uint32 ProbeClipmap::ScheduleJobs(uint32* jobs, const Settings& settings)
 		share_total += share;
 	}
 
+	// Then the probes whose light changed: each level up to its share, and what that leaves to whichever still has
+	// some, finest first
+	const uint32 first_dirty = job_count;
+	const uint32 dirty_budget = (budget - job_count) * scDirtyBudgetNumerator / scDirtyBudgetDenominator;
+	const uint32 dirty_limit = job_count + dirty_budget;
+
+	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
+		const uint32 quota = dirty_budget * scLevelShares[level_index] / share_total;
+		job_count = ScheduleDirtyJobs(level_index, jobs, job_count, std::min(job_count + quota, dirty_limit));
+	}
+
+	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
+		job_count = ScheduleDirtyJobs(level_index, jobs, job_count, dirty_limit);
+	}
+
+	mLastDirtyJobCount = job_count - first_dirty;
+
+	// The rest of the budget refreshes the oldest probes, round robin, shared between the levels
+	const uint32 remaining = budget - job_count;
+
 	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
 		Level& level = mLevels[level_index];
 		const uint32 quota = std::min(remaining * scLevelShares[level_index] / share_total, scProbesPerLevel);
 
-		for (uint32 index = 0; index < quota && job_count < budget; index++) {
+		// One lap at most, past the slots that hold nothing to refresh, so a level with few live probes still gets
+		// its share of jobs
+		uint32 scheduled = 0;
+
+		for (uint32 index = 0; index < scProbesPerLevel && scheduled < quota && job_count < budget; index++) {
 			const uint32 slot = level.Cursor;
 			level.Cursor = (level.Cursor + 1) % scProbesPerLevel;
 
-			if (level.Valid[slot] != 1) {
+			if (level.Valid[slot] != 1 || level.JobStamp[slot] == mUpdateCount) {
 				continue;
 			}
 
 			jobs[job_count++] = slot | (level_index << scJobLevelShift);
+			level.JobStamp[slot] = mUpdateCount;
+			scheduled++;
 		}
 	}
 
@@ -489,13 +815,23 @@ void ProbeClipmap::LogStats(uint32 frame, uint32 job_count)
 		return;
 	}
 
+	uint32 dead[scLevelCount] = {};
+
+	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
+		for (uint32 slot = 0; slot < scProbesPerLevel; slot++) {
+			dead[level_index] += (mLevels[level_index].Valid[slot] == scDead) ? 1U : 0U;
+		}
+	}
+
 	const float64 blended = std::max(1.0, static_cast<float64>(stats[scStatBlended]));
 	const float64 updated = std::max(1.0, static_cast<float64>(stats[scStatBlended] + stats[scStatReset]));
 
 	LogInfo(LC_RENDER,
-			"GI clipmap: {} probes traced ({} new), unfilled {} / {} / {}, mean change {:.4f}, {} black, {:.1f}% "
-			"backface rays, {} switched off, {} moved",
-			job_count, stats[scStatReset], mLevels[0].InvalidCount, mLevels[1].InvalidCount, mLevels[2].InvalidCount,
+			"GI clipmap: {} probes traced ({} new, {} dirty, {} / {} / {} still dirty), unfilled {} / {} / {}, masked "
+			"out {} / {} / {}, {:.0f} lux on average, mean change {:.4f}, {} black, {:.1f}% backface rays, {} switched off, {} moved",
+			job_count, stats[scStatReset], mLastDirtyJobCount, mLevels[0].DirtyCount, mLevels[1].DirtyCount,
+			mLevels[2].DirtyCount, mLevels[0].InvalidCount, mLevels[1].InvalidCount, mLevels[2].InvalidCount, dead[0],
+			dead[1], dead[2], static_cast<float64>(stats[scStatLight]) / scStatLightScale / updated * 3.14159265,
 			static_cast<float64>(stats[scStatChange]) / scStatChangeScale / blended, stats[scStatBlack],
 			100.0 * static_cast<float64>(stats[scStatBackfaces]) / (updated * scRayCount), stats[scStatInactive],
 			stats[scStatMoved]);
@@ -516,6 +852,11 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	LogStats(frame, mLastJobCount);
 	mUpdateCount++;
 
+	if (settings.bUseMask != mbMaskInUse) {
+		mbMaskInUse = settings.bUseMask;
+		Reset();
+	}
+
 	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
 		PlaceLevel(level_index, center);
 	}
@@ -523,6 +864,8 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	uint32* jobs = reinterpret_cast<uint32*>(mJobs.pMappedBuffer) + static_cast<uint64>(frame) * scMaxJobsPerFrame;
 	const uint32 job_count = ScheduleJobs(jobs, settings);
 	mLastJobCount = job_count;
+
+	uint32 live_count[scLevelCount] = {};
 
 	uint32* state = reinterpret_cast<uint32*>(mState.pMappedBuffer) +
 					static_cast<uint64>(frame) * scLevelCount * scProbesPerLevel;
@@ -533,6 +876,7 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 
 		for (uint32 slot = 0; slot < scProbesPerLevel; slot++) {
 			level_state[slot] = (level.Valid[slot] == 1) ? scStateValid : 0U;
+			live_count[level_index] += (level.Valid[slot] != 0 && level.Valid[slot] != scDead) ? 1U : 0U;
 
 			if (level.Valid[slot] == scPending) {
 				level.Valid[slot] = 1;
@@ -586,6 +930,28 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	consts.Blend[2] = settings.ChangeThreshold;
 	consts.Blend[3] = settings.MomentSharpness;
 
+	// The hysteresis is for a level 0 probe that is refreshed once every lap of a full window. A level whose probes
+	// come round more or less often than that blends less or more per update, so they all follow the light equally
+	// fast, and a map with few live probes gets less noise out of the same budget.
+	uint32 share_total = 0;
+
+	for (const uint32 share : scLevelShares) {
+		share_total += share;
+	}
+
+	const float32 budget = static_cast<float32>(std::max(std::min(settings.Budget, scMaxJobsPerFrame), 1U));
+	const float32 nominal_period = static_cast<float32>(scProbesPerLevel) /
+								   (budget * static_cast<float32>(scLevelShares[0]) / static_cast<float32>(share_total));
+
+	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
+		const float32 quota = budget * static_cast<float32>(scLevelShares[level_index]) / static_cast<float32>(share_total);
+		const float32 period = std::max(static_cast<float32>(live_count[level_index]) / std::max(quota, 1.0f), 1.0f);
+
+		consts.LevelRate[level_index] = std::clamp(period / nominal_period, 1.0f / 16.0f, 8.0f);
+	}
+
+	consts.LevelRate[3] = settings.DirtyHysteresis;
+
 	const uint32 consts_offset = gGraphics->FrameAlloc.Push(consts);
 
 	const uint32 columns = std::min(job_count, scJobColumns);
@@ -634,6 +1000,7 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 		ImageBarrier(cmd, mpIrradiance[level_index], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		ImageBarrier(cmd, mpMoments[level_index], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
+
 }
 
 void ProbeClipmap::WriteForwardData(uint32 frame, const Settings& settings)

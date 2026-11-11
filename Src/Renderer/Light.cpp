@@ -71,8 +71,8 @@ void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera,
 	data.Position[0] = mPosition.X;
 	data.Position[1] = mPosition.Y;
 	data.Position[2] = mPosition.Z;
-	data.Color = Color.Value;
-	Color.GetLinearRGB(data.LinearColor);
+	data.Color = LightColor.Value;
+	LightColor.GetLinearRGB(data.LinearColor);
 	data.Intensity = Intensity;
 
 	data.Type = static_cast<uint32>(Type);

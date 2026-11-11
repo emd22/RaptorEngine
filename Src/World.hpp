@@ -151,6 +151,9 @@ private:
 	void AddTileToLightList(TileIndex tile_index, const Frustum* frustum = nullptr,
 							const PortalVisibility* portals = nullptr);
 	void AddUnculledLightsToLightList();
+	/// Adds the culled lights that still reach what the GI probes around `center` can see
+	void AddGILightsToLightList(const FVec3& center);
+	bool IsClipmapGIUpdating() const;
 	void ClearRenderList();
 
 	void AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID* id);
@@ -232,6 +235,9 @@ public:
 	CVarValue* pCVarGIHysteresis = nullptr;
 	CVarValue* pCVarGIBounce = nullptr;
 	CVarValue* pCVarGIRelocate = nullptr;
+	CVarValue* pCVarGIRayLength = nullptr;
+	CVarValue* pCVarGIDirty = nullptr;
+	CVarValue* pCVarGIProbeMask = nullptr;
 
 	uint32 FrustumTestedObjects = 0;
 	uint32 FrustumCulledObjects = 0;

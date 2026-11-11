@@ -69,6 +69,9 @@ public:
 	FX_FORCE_INLINE bool IsCullable() const { return Type != eLightType::Directional; }
 	FX_FORCE_INLINE bool IsPersistent() const { return (Flags & LF_Persistent) != 0; }
 
+	void SetColor(const Color color) { LightColor = color; }
+	Color GetColor() { return LightColor; }
+
 	virtual void Render(const PerspectiveCamera& camera, BaseCamera* shadow_camera);
 
 	virtual ~LightBase() {}
@@ -83,7 +86,7 @@ protected:
 public:
 	LightID ID = LightID::scNull;
 
-	struct Color Color = Color::sWhite;
+	struct Color LightColor = Color::sWhite;
 	float32 Intensity = 100000.0f;
 
 	eLightFlags Flags = LF_None;

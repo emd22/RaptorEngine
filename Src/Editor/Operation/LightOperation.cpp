@@ -24,7 +24,7 @@ LightSnapshot LightSnapshot::Capture(const LightSpot& light)
 		.InnerAngle = light.GetInnerAngle(),
 		.OuterAngle = light.GetOuterAngle(),
 		.bCastShadows = light.bCastShadows,
-		.Colour = light.Color,
+		.Colour = light.LightColor,
 		.Intensity = light.Intensity,
 	};
 }
@@ -62,7 +62,7 @@ void LightEditOperation::Restore(const LightSnapshot& snapshot)
 	light->SetRadius(snapshot.Radius);
 	light->SetConeAngles(snapshot.InnerAngle, snapshot.OuterAngle);
 	light->bCastShadows = snapshot.bCastShadows;
-	light->Color = snapshot.Colour;
+	light->LightColor = snapshot.Colour;
 	light->Intensity = snapshot.Intensity;
 
 	mpLight = &(*light);

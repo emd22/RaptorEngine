@@ -87,10 +87,13 @@ void main(uint3 group : SV_GroupID, uint ray : SV_GroupIndex)
 
 		// The hit is seen from the probe, so the view bias points back along the ray
 		const float dither = frac(float(job_index * 64u + ray + Consts.vInfo.y * 977u) * 0.6180339887);
-		const ClipmapGatherResult bounced = ClipmapGather(position, normal, -direction, normal, normal, dither);
+		const ClipmapGatherResult bounced = ClipmapGatherDiffuse(position, normal, -direction, dither);
 		const bool has_bounce = and(HAS_FLAG(Consts.vInfo.z, CLIPMAP_FLAG_BOUNCE), bounced.uiLevel < CLIPMAP_LEVELS);
 
 		radiance += select(has_bounce, albedo * bounced.vDiffuse, float3(0.0, 0.0, 0.0));
+
+		// The back of a surface is inside something, or outside the map, and sends nothing back, as in the bake
+		radiance = select(is_backface, float3(0.0, 0.0, 0.0), radiance);
 
 		// Backfaces are kept as negative distances, for telling probes inside walls apart later
 		distance = select(is_backface, -hit.fDistance, hit.fDistance);

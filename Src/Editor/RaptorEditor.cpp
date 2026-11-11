@@ -415,7 +415,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 
 		world.bHasSun = true;
 		world.bSunEnabled = gCVars->Get("b_sun_enabled", true);
-		world.SunColor = sun->Color;
+		world.SunColor = sun->LightColor;
 		world.SunIntensity = sun->Intensity;
 		world.SunAzimuthDegrees = angles.X;
 		world.SunElevationDegrees = angles.Y;
@@ -449,7 +449,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 
 		panel.bHasLight = true;
 		panel.Name = light->Name.Get();
-		panel.Color = light->Color;
+		panel.Color = light->LightColor;
 		panel.Position = light->GetPosition();
 		panel.Radius = light->GetRadius();
 		panel.Intensity = light->Intensity;
@@ -1216,7 +1216,7 @@ void RaptorEditor::SetSunColor(Color color)
 		return;
 	}
 
-	sun->Color = Color::FromRGBA(color.R, color.G, color.B, 255);
+	sun->LightColor = Color::FromRGBA(color.R, color.G, color.B, 255);
 	MarkModified();
 }
 

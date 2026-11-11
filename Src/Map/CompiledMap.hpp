@@ -254,6 +254,60 @@ struct CompiledMapSDFPages
 	bool IsEmpty() const { return Levels.Size == 0 || SDFPages.Size == 0 || Triangles.Size == 0; }
 };
 
+struct CompiledMapProbeMaskLevel
+{
+	float32 Spacing = 0.0f;
+	/// The box's minimum grid point, in spacings
+	int32 Origin[3] = {};
+	/// Grid points along each axis
+	uint32 Size[3] = {};
+	/// Where the level's bits start in CompiledMapProbeMask::Words
+	uint32 FirstWord = 0;
+};
+
+/**
+ * @brief Which points of the runtime GI probe grids can hold a probe: a bit per grid point of every level, set where
+ * the point, or somewhere a probe there could be moved to, is in open space that the map's entities can reach.
+ */
+struct CompiledMapProbeMask
+{
+	static constexpr uint32 scMaxLevels = 8;
+
+	/// Whether grid points outside a level's box are dead as well, which they are when the map is sealed
+	uint32 bOutsideDead = 0;
+
+	SizedArray<CompiledMapProbeMaskLevel> Levels;
+	/// X fastest, then Y, then Z
+	SizedArray<uint32> Words;
+
+	bool IsEmpty() const { return Levels.Size == 0 || Words.Size == 0; }
+
+	/// Whether a probe may be at `probe` (in spacings) on `level`. True where the map has no mask for it.
+	bool IsAlive(uint32 level, const int32 probe[3]) const
+	{
+		if (level >= Levels.Size) {
+			return true;
+		}
+
+		const CompiledMapProbeMaskLevel& mask = Levels[level];
+		uint32 local[3];
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			const int64 offset = static_cast<int64>(probe[axis]) - mask.Origin[axis];
+
+			if (offset < 0 || offset >= static_cast<int64>(mask.Size[axis])) {
+				return bOutsideDead == 0;
+			}
+
+			local[axis] = static_cast<uint32>(offset);
+		}
+
+		const uint64 bit = local[0] + static_cast<uint64>(mask.Size[0]) * (local[1] + static_cast<uint64>(mask.Size[1]) * local[2]);
+
+		return ((Words[mask.FirstWord + bit / 32] >> (bit % 32)) & 1U) != 0;
+	}
+};
+
 struct CompiledMapHull
 {
 	SizedArray<float32> Points;
@@ -307,7 +361,7 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 17;
+	static constexpr uint32 scVersion = 18;
 	/// Oldest version that still loads, the parts added since are left empty
 	static constexpr uint32 scMinVersion = 10;
 	static constexpr const char* scExtension = ".fxmap";
@@ -364,6 +418,7 @@ public:
 	CompiledMapLightmap Lightmap;
 	CompiledMapTransport Transport;
 	CompiledMapSDFPages SDFPages;
+	CompiledMapProbeMask ProbeMask;
 
 	SizedArray<uint8> ProbeSunVisibility;
 

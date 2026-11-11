@@ -87,6 +87,12 @@ struct ShadeLightCandidate
 	bool bDirectional = false;
 	FVec3 Position = FVec3::sZero;
 	float32 Radius = 0.0f;
+
+	/// What the GI probes watch for changes, see ProbeClipmap::TrackLights()
+	uint32 ID = 0;
+	float32 Rotation[4] = {};
+	float32 Intensity = 0.0f;
+	uint32 Color = 0;
 };
 
 struct GpuUploadContext

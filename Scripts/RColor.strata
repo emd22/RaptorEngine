@@ -1,0 +1,20 @@
+
+struct RColorValue = uint;
+
+impl RColorValue
+{
+	RColorValue FromRGBA(byte r, byte g, byte b, byte a)
+	{
+		return (RColorValue)((((uint)a) << 24) | (((uint)b) << 16) | (((uint)g) << 8) | (((uint)r)));
+	}
+
+	byte GetR(const RColorValue value) { return (byte)(value); }
+	byte GetG(const RColorValue value) { return (byte)((uint)value >> 8); }
+	byte GetB(const RColorValue value) { return (byte)((uint)value >> 16); }
+	byte GetA(const RColorValue value) { return (byte)((uint)value >> 24); }
+
+	property byte R { get = RColorValue_GetR; }
+	property byte G { get = RColorValue_GetG; }
+	property byte B { get = RColorValue_GetB; }
+	property byte A { get = RColorValue_GetA; }
+}

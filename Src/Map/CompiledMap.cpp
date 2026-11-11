@@ -25,6 +25,7 @@ constexpr uint32 scFirstOctahedralProbeVersion = 16;
 /// branches: one wrote cube moments and SDF pages, the other octahedral moments and no SDF pages. Load() tells them
 /// apart by the size of the moments and by whether anything follows the transport.
 constexpr uint32 scFirstSDFPagesVersion = 17;
+constexpr uint32 scFirstProbeMaskVersion = 18;
 /// Values per probe in the cube face moments from before the octahedral layout (6 faces of 16x16, mean + variance)
 constexpr uint32 scCubeProbeMomentValues = 6 * 16 * 16 * 2;
 constexpr int scDeflateLevel = 9;
@@ -495,6 +496,35 @@ void WriteSDFPages(Writer& writer, const CompiledMapSDFPages& pages)
 	WriteSectionArray(writer, pages.Triangles);
 }
 
+void ReadProbeMask(Reader& reader, CompiledMapProbeMask& out_mask)
+{
+	out_mask.bOutsideDead = reader.Read<uint32>();
+
+	ReadSectionArray(reader, out_mask.Levels);
+	ReadSectionArray(reader, out_mask.Words);
+
+	bool valid = !reader.bFailed && out_mask.Levels.Size <= CompiledMapProbeMask::scMaxLevels;
+
+	for (const CompiledMapProbeMaskLevel& level : out_mask.Levels) {
+		const uint64 bits = static_cast<uint64>(level.Size[0]) * level.Size[1] * level.Size[2];
+
+		valid = valid && level.Spacing > 0.0f && level.FirstWord + (bits + 31) / 32 <= out_mask.Words.Size;
+	}
+
+	// The GI can do without it, so the rest of the map still loads
+	if (!valid) {
+		out_mask = CompiledMapProbeMask {};
+	}
+}
+
+void WriteProbeMask(Writer& writer, const CompiledMapProbeMask& mask)
+{
+	writer.Write(mask.bOutsideDead);
+
+	WriteSectionArray(writer, mask.Levels);
+	WriteSectionArray(writer, mask.Words);
+}
+
 void WriteFogShadow(Writer& writer, const CompiledMapFogShadow& shadow)
 {
 	writer.Write(shadow.Right, 3);
@@ -918,6 +948,10 @@ bool CompiledMap::Load(const String& path)
 		ReadSDFPages(reader, SDFPages);
 	}
 
+	if (version >= scFirstProbeMaskVersion && !reader.bFailed) {
+		ReadProbeMask(reader, ProbeMask);
+	}
+
 	for (const CompiledMapSurface& surface : Surfaces) {
 		if (surface.Area != scNoMapArea && (surface.Area < 0 || static_cast<size_t>(surface.Area) >= Areas.Size)) {
 			reader.bFailed = true;
@@ -1080,6 +1114,7 @@ bool CompiledMap::Save(const String& path) const
 
 	WriteTransport(writer, Transport);
 	WriteSDFPages(writer, SDFPages);
+	WriteProbeMask(writer, ProbeMask);
 
 	return (writer.bFailed == false);
 }

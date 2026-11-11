@@ -1,6 +1,7 @@
 
 import ../RLight;
 import ../RObject;
+import ../RColor;
 
 import ../math;
 
@@ -23,12 +24,14 @@ void ObjectBegin(RObject obj)
 	gLight.SetPosition(float3(0.0f));
 	gLight.SetRadius(30.0f);
 
+	gLight.SetColor(RColorValue.FromRGBA(255, 100, 100, 255));
+
 	printf("Creating light\n");
 }
 
 void ObjectTick(RObject obj, float delta_time)
 {
-	gTime += delta_time * 4.0f;
+	gTime += delta_time * 2.5f;
 	if (gTime > F_2PI) {
 		gTime = 0.0f;
 	}

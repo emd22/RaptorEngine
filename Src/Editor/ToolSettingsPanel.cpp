@@ -120,7 +120,7 @@ void LightToolSettingsPanel::OnColorChange(wxColourPickerEvent& event)
 		[red = colour.Red(), green = colour.Green(), blue = colour.Blue()]
 		{
 			if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
-				light->Color = Color::FromRGBA(red, green, blue, 255);
+				light->LightColor = Color::FromRGBA(red, green, blue, 255);
 				gEditor->MarkModified();
 			}
 		});

@@ -1,5 +1,6 @@
 /* Functions and interop for creating and managing lights from scripts. */
 
+import ./RColor;
 
 enum RLightType : uint
 {
@@ -42,6 +43,9 @@ impl RLightSpot
 	extern float GetOuterAngle(RLightSpot light);
 
 	extern void SetDirection(RLightSpot light, float3 direction);
+
+	extern void SetColor(RLightSpot light, RColorValue color);
+	extern RColorValue GetColor(RLightSpot light);
 
 	extern void Destroy(RLightSpot light);
 }

@@ -1074,6 +1074,9 @@ static eLightFlags N_RLightSpot_GetFlags(LightSpot* light) { return light->Flags
 static void N_RLightSpot_SetFlags(LightSpot* light, eLightFlags flags) { light->SetFlags(flags); }
 static void N_RLightSpot_SetDirection(LightSpot* light, FLOAT4 direction) { light->SetDirection(FVec3(direction)); }
 
+static void N_RLightSpot_SetColor(LightSpot* light, uint32 color) { light->SetColor(Color(color)); }
+static uint32 N_RLightSpot_GetColor(LightSpot* light) { return light->GetColor().AsUInt(); }
+
 static void N_RLightSpot_Destroy(LightSpot* light) { gLightManager->RemoveLight(light->ID); }
 
 
@@ -1120,6 +1123,8 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("RLightSpot_GetInnerAngle", N_RLightSpot_GetInnerAngle),
 	PREDEF("RLightSpot_GetOuterAngle", N_RLightSpot_GetOuterAngle),
 	PREDEF("RLightSpot_SetDirection", N_RLightSpot_SetDirection),
+	PREDEF("RLightSpot_SetColor", N_RLightSpot_SetColor),
+	PREDEF("RLightSpot_GetColor", N_RLightSpot_GetColor),
 	PREDEF("RLightSpot_Destroy", N_RLightSpot_Destroy),
 
 	PREDEF("blockout_reload_object", N_blockout_reload_object),

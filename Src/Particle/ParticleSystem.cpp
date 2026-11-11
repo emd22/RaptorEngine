@@ -772,7 +772,7 @@ void ParticleSystem::UpdateLighting(float32 delta_time)
 
 	if (sun != nullptr && sun->bEnabled) {
 		float32 sun_color[3];
-		sun->Color.GetLinearRGB(sun_color);
+		sun->LightColor.GetLinearRGB(sun_color);
 
 		sun_direction = sun->GetPosition().Normalize();
 		sun_irradiance = FVec3(sun_color[0], sun_color[1], sun_color[2]) * sun->Intensity;

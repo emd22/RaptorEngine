@@ -9,11 +9,12 @@
 #define CLIPMAP_PROBES_PER_LEVEL (CLIPMAP_GRID_X * CLIPMAP_GRID_Y * CLIPMAP_GRID_Z)
 #define CLIPMAP_RAYS 64
 
-/// Irradiance is 8x8 per probe on every level, depth moments 16x16 on level 0 and 8x8 on the others. Each tile has a
-/// one texel border holding the texels across the octahedral seams.
+/// Irradiance is 8x8 per probe and depth moments 16x16, on every level: the coarse levels' probes are the farthest
+/// from what they light, so they need the depth resolution the most. Each tile has a one texel border holding the
+/// texels across the octahedral seams.
 #define CLIPMAP_IRRADIANCE_SIZE 8
 #define CLIPMAP_MOMENTS_SIZE_0 16
-#define CLIPMAP_MOMENTS_SIZE 8
+#define CLIPMAP_MOMENTS_SIZE 16
 
 /// Tiles are laid out with X and Y side by side across the image and Z down it
 #define CLIPMAP_TILE_COLUMNS (CLIPMAP_GRID_X * CLIPMAP_GRID_Y)

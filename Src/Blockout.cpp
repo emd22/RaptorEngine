@@ -842,6 +842,7 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	renderer::gGraphics->ClearFogShadow();
 	renderer::gGraphics->Transport.Clear();
 	renderer::gGraphics->SDFPages.Clear();
+	renderer::gGraphics->GIClipmap.SetProbeMask(CompiledMapProbeMask {});
 	renderer::gGraphics->GIClipmap.Reset();
 
 	mbHasBakedSun = false;
@@ -984,6 +985,7 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 	}
 
 	renderer::gGraphics->SDFPages.Upload(map.SDFPages);
+	renderer::gGraphics->GIClipmap.SetProbeMask(map.ProbeMask);
 	renderer::gGraphics->GIClipmap.Reset();
 
 	mbHasBakedSun = has_lightmap && map.HasBakedSun();
@@ -2794,7 +2796,7 @@ void Blockout::AddOrUpdateLightFromEntry(const ConfigEntry& light_entry)
 	}
 
 	light->SetPosition(data.Position);
-	light->Color = data.Color;
+	light->LightColor = data.Color;
 	light->Intensity = data.Intensity;
 	light->SetRadius(data.Radius);
 
@@ -2840,7 +2842,7 @@ void Blockout::LoadLights(ConfigFile& info)
 
 	if (sun_entry) {
 		sun->SetPosition(sun_data.Position);
-		sun->Color = sun_data.Color;
+		sun->LightColor = sun_data.Color;
 		sun->Intensity = sun_data.Intensity;
 	}
 
@@ -2866,7 +2868,7 @@ void Blockout::SaveLights(ConfigFile& info)
 		const SunLightEntry sun_data {
 			.bEnabled = sun->bEnabled,
 			.Position = sun->GetPosition(),
-			.Color = sun->Color,
+			.Color = sun->LightColor,
 			.Intensity = sun->Intensity,
 		};
 
@@ -2892,7 +2894,7 @@ void Blockout::SaveLights(ConfigFile& info)
 		LightEntry data {
 			.Type = ePrxLightType::Point,
 			.Position = light->GetPosition(),
-			.Color = light->Color,
+			.Color = light->LightColor,
 			.Intensity = light->Intensity,
 			.Radius = light->GetRadius(),
 		};

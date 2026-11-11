@@ -790,11 +790,12 @@ PERMIF(CLIPMAP_GI);
 		probe_radiance = clipmap.vSpecular;
 		has_probes = clipmap.uiLevel < CLIPMAP_LEVELS;
 
+PERMNOT(USE_LIGHTMAP);
 		// The clipmap has no sun term, so surfaces without a lightmap look the baked sun up directly
-		const ClipmapForwardData clipmap_data = bClipmapForward[0];
-		const float baked_sun = SampleBakedSunShadowPages(clipmap_data.BakedSun, input.vPositionWS + geometric_normal * 0.05,
-														  1.0, float2(1.0, 0.0));
-		probe_sun_visibility = select(HAS_FLAG(clipmap_data.vInfo.x, CLIPMAP_FORWARD_FLAG_BAKED_SUN), baked_sun, 1.0);
+		const float baked_sun = SampleBakedSunShadowPages(bClipmapForward[0].BakedSun,
+														  input.vPositionWS + geometric_normal * 0.05, 1.0, float2(1.0, 0.0));
+		probe_sun_visibility = select(HAS_FLAG(bClipmapForward[0].vInfo.x, CLIPMAP_FORWARD_FLAG_BAKED_SUN), baked_sun, 1.0);
+PERMEND();
 	}
 PERMELSE();
 	if (use_probes) {

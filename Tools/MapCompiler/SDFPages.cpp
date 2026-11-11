@@ -179,7 +179,9 @@ void GatherTriangles(const MapSource& source, const SurfaceBuilder& surfaces, co
 		}
 	}
 
-	const uint32 blocker_albedo = PackAlbedo(FVec3(scDefaultAlbedo));
+	// Blockers are faces nobody is meant to see, kept to stop light. The bake gives rays that reach one nothing, and so
+	// do the probes: black, so neither the sun on them nor what bounces off them comes back.
+	const uint32 blocker_albedo = PackAlbedo(FVec3(0.0f));
 
 	for (size_t index = 0; index + 2 < surfaces.BlockerPoints.Size; index += 3) {
 		AddTriangle(out_triangles, out_albedos, blocker_albedo, (surfaces.BlockerPoints[index]), (surfaces.BlockerPoints[index + 1]),

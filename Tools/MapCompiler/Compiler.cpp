@@ -160,6 +160,125 @@ void AddHulls(const PlaneSet& planes, const MapSource& source, CompiledMap& map)
 	}
 }
 
+/// Mirror ProbeClipmap::scLevelCount and scLevel0Spacing, and CLIPMAP_MAX_OFFSET in Shaders/ProbeClipmapCommon.hlsli
+constexpr uint32 scProbeMaskLevels = 3;
+constexpr double scProbeMaskSpacing = 1.0;
+constexpr double scProbeMaskOffsets[2] = { 0.2, 0.4 };
+
+/**
+ * @brief Marks the points of the runtime GI probe grids that can hold a probe. A point inside a brush, or in space the
+ * flood fill did not reach, still counts where a probe there could be moved into reached space, since the runtime
+ * moves probes out of walls by up to that much.
+ */
+void BuildProbeMask(const Bsp& bsp, const MapSource& source, bool sealed, CompiledMap& map, const LogFunction& log)
+{
+	enum class ePoint
+	{
+		Open,
+		Solid,
+		Void,
+	};
+
+	const auto classify = [&](const DVec3& point)
+	{
+		const Node& leaf = bsp.Nodes[static_cast<size_t>(bsp.FindLeaf(point))];
+
+		if (leaf.bSolid) {
+			return ePoint::Solid;
+		}
+
+		if (sealed && !leaf.bReached) {
+			return ePoint::Void;
+		}
+
+		return ePoint::Open;
+	};
+
+	CompiledMapProbeMask& mask = map.ProbeMask;
+	mask.bOutsideDead = sealed ? 1U : 0U;
+	mask.Levels.InitSize(scProbeMaskLevels);
+
+	const double min[3] = { source.Min.X, source.Min.Y, source.Min.Z };
+	const double max[3] = { source.Max.X, source.Max.Y, source.Max.Z };
+
+	uint64 word_count = 0;
+
+	for (uint32 level_index = 0; level_index < scProbeMaskLevels; level_index++) {
+		CompiledMapProbeMaskLevel& level = mask.Levels[level_index];
+		const double spacing = scProbeMaskSpacing * static_cast<double>(1U << level_index);
+
+		level.Spacing = static_cast<float32>(spacing);
+		level.FirstWord = static_cast<uint32>(word_count);
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			const int32 first = static_cast<int32>(std::floor(min[axis] / spacing)) - 1;
+			const int32 last = static_cast<int32>(std::ceil(max[axis] / spacing)) + 1;
+
+			level.Origin[axis] = first;
+			level.Size[axis] = static_cast<uint32>(last - first + 1);
+		}
+
+		word_count += (static_cast<uint64>(level.Size[0]) * level.Size[1] * level.Size[2] + 31) / 32;
+	}
+
+	mask.Words.InitSize(word_count, 0U);
+
+	for (uint32 level_index = 0; level_index < scProbeMaskLevels; level_index++) {
+		const CompiledMapProbeMaskLevel& level = mask.Levels[level_index];
+		const double spacing = level.Spacing;
+
+		uint64 open = 0;
+		uint64 moved = 0;
+		uint64 solid = 0;
+		uint64 outside = 0;
+		uint64 bit = 0;
+
+		for (uint32 z = 0; z < level.Size[2]; z++) {
+			for (uint32 y = 0; y < level.Size[1]; y++) {
+				for (uint32 x = 0; x < level.Size[0]; x++, bit++) {
+					const DVec3 point((static_cast<double>(level.Origin[0]) + x) * spacing,
+									  (static_cast<double>(level.Origin[1]) + y) * spacing,
+									  (static_cast<double>(level.Origin[2]) + z) * spacing);
+
+					const ePoint at_point = classify(point);
+					bool is_alive = (at_point == ePoint::Open);
+
+					for (uint32 step = 0; step < 2 && !is_alive; step++) {
+						const double reach = scProbeMaskOffsets[step] * spacing;
+
+						for (int32 direction = 0; direction < 27 && !is_alive; direction++) {
+							const DVec3 offset((direction % 3 - 1) * reach, ((direction / 3) % 3 - 1) * reach,
+											   (direction / 9 - 1) * reach);
+
+							is_alive = (direction != 13) && (classify(point + offset) == ePoint::Open);
+						}
+					}
+
+					if (is_alive) {
+						mask.Words[level.FirstWord + bit / 32] |= (1U << (bit % 32));
+
+						if (at_point == ePoint::Open) {
+							open++;
+						}
+						else {
+							moved++;
+						}
+					}
+					else if (at_point == ePoint::Solid) {
+						solid++;
+					}
+					else {
+						outside++;
+					}
+				}
+			}
+		}
+
+		log(String::Fmt("  probe mask   {} m: {} x {} x {} points, {} open, {} kept for a move, {} in brushes, {} outside",
+						spacing, level.Size[0], level.Size[1], level.Size[2], open, moved, solid, outside));
+	}
+}
+
 bool WriteObj(const String& path, const CompiledMap& map)
 {
 	// std::FILE* file = std::fopen(path.CStr(), "w");
@@ -461,6 +580,10 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	if (source.Brushes.Size != 0) {
 		BuildSDFPages(source, surfaces, &models, options.SDFPages, map, result.SDFPages);
+	}
+
+	if (source.Brushes.Size != 0 && options.SDFPages.bEnabled) {
+		BuildProbeMask(bsp, source, sealed, map, log);
 	}
 
 	const String leak_path = ReplaceExtension(result.OutputPath, ".leak");

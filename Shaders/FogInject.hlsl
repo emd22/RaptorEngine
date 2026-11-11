@@ -57,11 +57,16 @@ float3 SampleClipmapIrradiance(uint level, uint slot, float3 direction)
 						 (ClipmapDirectionToOct(direction) * 0.5 + 0.5) * float(CLIPMAP_IRRADIANCE_SIZE);
 	const float2 uv = texel / image_size;
 
-	float3 value = F_SampleLevel(tIrradiance2, uv, 0.0).rgb;
-	value = select(level == 1, F_SampleLevel(tIrradiance1, uv, 0.0).rgb, value);
-	value = select(level == 0, F_SampleLevel(tIrradiance0, uv, 0.0).rgb, value);
+	// One level is read per froxel, so this branches: selecting would read all three images
+	if (level == 0) {
+		return F_SampleLevel(tIrradiance0, uv, 0.0).rgb;
+	}
 
-	return value;
+	if (level == 1) {
+		return F_SampleLevel(tIrradiance1, uv, 0.0).rgb;
+	}
+
+	return F_SampleLevel(tIrradiance2, uv, 0.0).rgb;
 }
 
 /**
@@ -85,27 +90,39 @@ float4 SampleFogClipmap(float3 position_ws)
 		found = or(found, inside);
 	}
 
-	const float3 local = position_ws * scene.Levels[level].vParams.y;
-	const float3 base = floor(local);
-	const float3 cell_frac = local - base;
-
 	float3 sum = float3(0.0, 0.0, 0.0);
 	float total = 0.0;
 
-	[unroll]
-	for (uint corner = 0; corner < 8; corner++) {
-		const int3 offset = int3(corner, corner >> 1, corner >> 2) & 1;
-		const uint slot = ClipmapSlot(int3(base) + offset);
+	// Where none of the eight probes is filled (all in walls or outside the map), the next coarser level is read
+	for (uint attempt = 0; attempt < CLIPMAP_LEVELS; attempt++) {
+		const float3 local = position_ws * scene.Levels[level].vParams.y;
+		const float3 base = floor(local);
+		const float3 cell_frac = local - base;
 
-		const float3 axis = lerp(1.0 - cell_frac, cell_frac, float3(offset));
-		const bool is_valid = HAS_FLAG(bState[ClipmapProbeIndex(level, slot)], CLIPMAP_STATE_VALID);
-		const float weight = select(is_valid, axis.x * axis.y * axis.z, 0.0);
+		sum = float3(0.0, 0.0, 0.0);
+		total = 0.0;
 
-		const float3 mean = (SampleClipmapIrradiance(level, slot, float3(0.0, 1.0, 0.0)) +
-							 SampleClipmapIrradiance(level, slot, float3(0.0, -1.0, 0.0))) * 0.5;
+		[unroll]
+		for (uint corner = 0; corner < 8; corner++) {
+			const int3 offset = int3(corner, corner >> 1, corner >> 2) & 1;
+			const uint slot = ClipmapSlot(int3(base) + offset);
 
-		sum += mean * weight;
-		total += weight;
+			const float3 axis = lerp(1.0 - cell_frac, cell_frac, float3(offset));
+			const bool is_valid = HAS_FLAG(bState[ClipmapProbeIndex(level, slot)], CLIPMAP_STATE_VALID);
+			const float weight = select(is_valid, axis.x * axis.y * axis.z, 0.0);
+
+			const float3 mean = (SampleClipmapIrradiance(level, slot, float3(0.0, 1.0, 0.0)) +
+								 SampleClipmapIrradiance(level, slot, float3(0.0, -1.0, 0.0))) * 0.5;
+
+			sum += mean * weight;
+			total += weight;
+		}
+
+		if (total > 1e-3 || level + 1 >= CLIPMAP_LEVELS) {
+			break;
+		}
+
+		level++;
 	}
 
 	const float3 radiance = select(and(found, total > 1e-6), sum / max(total, 1e-6), float3(0.0, 0.0, 0.0));

@@ -26,46 +26,55 @@ F_FrameData(ProbeClipmapConsts, Consts, 1);
 #define STAT_BACKFACES 4
 #define STAT_INACTIVE 5
 #define STAT_MOVED 6
+#define STAT_LIGHT 7
+
+/// Fixed point scale of the summed probe light, and the most one probe adds, so the sum fits
+#define STAT_LIGHT_SCALE 4.0
+#define STAT_LIGHT_MAX 65536.0
 
 /// Fixed point scale of the summed relative change
 #define STAT_CHANGE_SCALE 10000.0
 
-#define MOMENTS_PER_THREAD ((CLIPMAP_MOMENTS_SIZE_0 * CLIPMAP_MOMENTS_SIZE_0) / CLIPMAP_RAYS)
+/// How much of each update goes into a texel's short term luminance, kept in the irradiance alpha. The blend speeds
+/// up where it and the irradiance disagree, which is decided before this update's rays are looked at: a decision made
+/// from the rays themselves blends bright outliers in faster than dark ones and brightens the probe over time.
+#define CLIPMAP_SHORT_BLEND 0.25
 
 groupshared float4 sRays[CLIPMAP_RAYS];
 groupshared float3 sDirections[CLIPMAP_RAYS];
-groupshared float3 sIrradiance[CLIPMAP_IRRADIANCE_SIZE * CLIPMAP_IRRADIANCE_SIZE];
+groupshared float4 sStored[CLIPMAP_IRRADIANCE_SIZE * CLIPMAP_IRRADIANCE_SIZE];
+groupshared float4 sIrradiance[CLIPMAP_IRRADIANCE_SIZE * CLIPMAP_IRRADIANCE_SIZE];
 groupshared float2 sMoments[CLIPMAP_MOMENTS_SIZE_0 * CLIPMAP_MOMENTS_SIZE_0];
 groupshared uint sChange;
-groupshared uint sPrevious;
+groupshared uint sPreviousSum;
 
 float Luminance(float3 colour) { return dot(colour, float3(0.2126, 0.7152, 0.0722)); }
 
 // The level is the same for the whole group, so these branches do not diverge
 
-float3 LoadIrradiance(uint level, uint2 address)
+float4 LoadIrradiance(uint level, uint2 address)
 {
 	if (level == 0) {
-		return tIrradiance0[address].rgb;
+		return tIrradiance0[address];
 	}
 
 	if (level == 1) {
-		return tIrradiance1[address].rgb;
+		return tIrradiance1[address];
 	}
 
-	return tIrradiance2[address].rgb;
+	return tIrradiance2[address];
 }
 
-void StoreIrradiance(uint level, uint2 address, float3 value)
+void StoreIrradiance(uint level, uint2 address, float4 value)
 {
 	if (level == 0) {
-		tIrradiance0[address] = float4(value, 1.0);
+		tIrradiance0[address] = value;
 	}
 	else if (level == 1) {
-		tIrradiance1[address] = float4(value, 1.0);
+		tIrradiance1[address] = value;
 	}
 	else {
-		tIrradiance2[address] = float4(value, 1.0);
+		tIrradiance2[address] = value;
 	}
 }
 
@@ -116,10 +125,14 @@ float2 GatherMoments(float3 normal, float max_distance, out float out_weight)
 	return sum / max(weight_sum, 1e-6);
 }
 
-/// Blends the new mean and second moment into the stored ones
+/// Blends the new mean and second moment into the stored ones. A texel that few of this update's rays came near
+/// takes less of it, since what it gathered then belongs to other directions.
 float2 BlendMoments(float2 stored, float2 fresh, float fresh_weight, float hysteresis, bool reset)
 {
-	const float2 blended = select(reset, fresh, lerp(fresh, stored, hysteresis));
+	// The lobe's mean over the sphere, times the ray count
+	const float expected_weight = float(CLIPMAP_RAYS) / (2.0 * (Consts.vBlend.w + 1.0));
+	const float coverage = saturate(fresh_weight / expected_weight);
+	const float2 blended = select(reset, fresh, lerp(stored, fresh, (1.0 - hysteresis) * coverage));
 
 	return select(fresh_weight > 1e-6, blended, stored);
 }
@@ -143,46 +156,66 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	const bool reset = or(ClipmapJobIsReset(job), HAS_FLAG(probe_flags, CLIPMAP_PROBE_RESET));
 	const ClipmapLevel level = Consts.Clipmap.Levels[level_index];
 
+	// Irradiance: one texel per thread, the cosine weighted mean radiance (irradiance / pi)
+	const uint2 irradiance_texel = uint2(thread % CLIPMAP_IRRADIANCE_SIZE, thread / CLIPMAP_IRRADIANCE_SIZE);
+	const uint2 irradiance_origin = ClipmapTileOrigin(slot, CLIPMAP_IRRADIANCE_SIZE + 2);
+
 	sRays[thread] = bRays[job_index * CLIPMAP_RAYS + thread];
 	sDirections[thread] = ClipmapRayDirection(thread, Consts.mRayRotation);
+	sStored[thread] = LoadIrradiance(level_index, irradiance_origin + irradiance_texel + 1);
 
 	if (thread == 0) {
 		sChange = 0;
-		sPrevious = 0;
+		sPreviousSum = 0;
 	}
 
 	GroupMemoryBarrierWithGroupSync();
 
-	// Irradiance: one texel per thread, the cosine weighted mean radiance (irradiance / pi)
-	const uint2 irradiance_texel = uint2(thread % CLIPMAP_IRRADIANCE_SIZE, thread / CLIPMAP_IRRADIANCE_SIZE);
 	const float3 normal = TexelDirection(irradiance_texel, CLIPMAP_IRRADIANCE_SIZE);
 
 	float3 radiance_sum = float3(0.0, 0.0, 0.0);
 	float weight_sum = 0.0;
+
+	// The probe's stored light and its short term light, over all of its texels (as many as there are rays)
+	float long_sum = 0.0;
+	float short_sum = 0.0;
 
 	for (uint ray = 0; ray < CLIPMAP_RAYS; ray++) {
 		const float weight = saturate(dot(normal, sDirections[ray]));
 
 		radiance_sum += sRays[ray].rgb * weight;
 		weight_sum += weight;
+
+		long_sum += Luminance(sStored[ray].rgb);
+		short_sum += sStored[ray].a;
 	}
 
 	const float3 fresh = radiance_sum / max(weight_sum, 1e-6);
+	const float3 previous = sStored[thread].rgb;
 
-	const uint2 irradiance_origin = ClipmapTileOrigin(slot, CLIPMAP_IRRADIANCE_SIZE + 2);
-	const float3 previous = LoadIrradiance(level_index, irradiance_origin + irradiance_texel + 1);
+	// Levels that are traced less often take more of each update, so that all of them follow the light equally fast
+	const float level_rate = Consts.vLevelRate[level_index];
+	const float slow_hysteresis = pow(Consts.vBlend.x, level_rate);
+	const float fast_hysteresis = pow(Consts.vBlend.y, level_rate);
 
-	const float change = abs(Luminance(fresh) - Luminance(previous)) / max(Luminance(previous), 1e-4);
-	const float hysteresis = select(change > Consts.vBlend.z, Consts.vBlend.y, Consts.vBlend.x);
+	const float disagreement = abs(short_sum - long_sum) / max(max(short_sum, long_sum), 1e-4);
+	const float adaptive_hysteresis = lerp(slow_hysteresis, fast_hysteresis,
+										   smoothstep(Consts.vBlend.z, Consts.vBlend.z * 2.0, disagreement));
+
+	// A probe whose light is known to have changed blends fastest, then eases back over its dirty updates, so it
+	// does not stop on the noise of its last fast one
+	const float dirty = float(ClipmapJobDirty(job)) / float(CLIPMAP_DIRTY_UPDATES);
+	const float hysteresis = min(adaptive_hysteresis, lerp(slow_hysteresis, Consts.vLevelRate.w, dirty));
 	const float3 blended = select(reset, fresh, lerp(fresh, previous, hysteresis));
+	const float short_term = select(reset, Luminance(fresh), lerp(sStored[thread].a, Luminance(fresh), CLIPMAP_SHORT_BLEND));
 
-	sIrradiance[thread] = blended;
+	sIrradiance[thread] = float4(blended, short_term);
 
 	// Relative change of the probe's summed luminance, a flicker measure for a still camera
 	const uint change_fixed = uint(min(abs(Luminance(blended) - Luminance(previous)), 1e6) * 16.0);
 	const uint previous_fixed = uint(min(Luminance(previous), 1e6) * 16.0);
 	InterlockedAdd(sChange, change_fixed);
-	InterlockedAdd(sPrevious, previous_fixed);
+	InterlockedAdd(sPreviousSum, previous_fixed);
 
 	// Depth moments
 	const bool is_fine = level_index == 0;
@@ -201,7 +234,7 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 
 		const float2 stored = LoadMoments(level_index, address);
 
-		sMoments[index] = BlendMoments(stored, fresh_moments, fresh_weight, Consts.vBlend.x, reset);
+		sMoments[index] = BlendMoments(stored, fresh_moments, fresh_weight, slow_hysteresis, reset);
 	}
 
 	GroupMemoryBarrierWithGroupSync();
@@ -296,7 +329,7 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		uint black = 1;
 
 		for (uint texel = 0; texel < CLIPMAP_IRRADIANCE_SIZE * CLIPMAP_IRRADIANCE_SIZE; texel++) {
-			black = select(any(sIrradiance[texel] > 0.0), 0u, black);
+			black = select(any(sIrradiance[texel].rgb > 0.0), 0u, black);
 		}
 
 		uint backfaces = 0;
@@ -305,12 +338,21 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 			backfaces += select(sRays[ray].w < 0.0, 1u, 0u);
 		}
 
-		const float relative = float(sChange) / max(float(sPrevious), 1.0);
+		const float relative = float(sChange) / max(float(sPreviousSum), 1.0);
 
 		InterlockedAdd(bStats[STAT_BLENDED], select(reset, 0u, 1u));
 		InterlockedAdd(bStats[STAT_CHANGE], select(reset, 0u, uint(min(relative, 10.0) * STAT_CHANGE_SCALE)));
 		InterlockedAdd(bStats[STAT_RESET], select(reset, 1u, 0u));
 		InterlockedAdd(bStats[STAT_BLACK], black);
 		InterlockedAdd(bStats[STAT_BACKFACES], backfaces);
+
+		float light = 0.0;
+
+		for (uint texel = 0; texel < CLIPMAP_IRRADIANCE_SIZE * CLIPMAP_IRRADIANCE_SIZE; texel++) {
+			light += Luminance(sIrradiance[texel].rgb);
+		}
+
+		light /= float(CLIPMAP_IRRADIANCE_SIZE * CLIPMAP_IRRADIANCE_SIZE);
+		InterlockedAdd(bStats[STAT_LIGHT], uint(min(light, STAT_LIGHT_MAX) * STAT_LIGHT_SCALE));
 	}
 }

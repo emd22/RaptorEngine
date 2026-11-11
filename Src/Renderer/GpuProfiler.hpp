@@ -110,7 +110,7 @@ public:
 	 */
 	void ReadResults(uint32 frame_index, double delta_seconds)
 	{
-		if (!mbEnabled || mWritten[frame_index] == 0) {
+		if (!mbEnabled || mCounts[frame_index] == 0) {
 			return;
 		}
 
@@ -126,25 +126,24 @@ public:
 			return;
 		}
 
+		// Stages are the gaps between consecutive markers in the order they were written, which is not always the
+		// enum order (the clipmap GI marks partway through the frame)
+		const uint32* order = mOrder[frame_index];
 		double stage_ms[scNumMarkers] = {};
-		int32 previous = -1;
 
-		for (uint32 marker = 0; marker < scNumMarkers; marker++) {
-			if ((mWritten[frame_index] & (1U << marker)) == 0) {
-				continue;
-			}
+		for (uint32 i = 0; i < mCounts[frame_index]; i++) {
+			const uint32 marker = order[i];
 
 			// One of the frame's markers did not land, so the frame is not usable
 			if (results[marker * 2 + 1] == 0) {
 				return;
 			}
 
-			if (previous >= 0) {
+			if (i > 0) {
+				const uint32 previous = order[i - 1];
 				const uint64 ticks = (results[marker * 2] - results[previous * 2]) & mValidMask;
 				stage_ms[marker] = static_cast<double>(ticks) * mMsPerTick;
 			}
-
-			previous = static_cast<int32>(marker);
 		}
 
 		for (uint32 marker = 0; marker < scNumMarkers; marker++) {
@@ -172,7 +171,7 @@ public:
 		}
 
 		mCurrentFrame = frame_index;
-		mWritten[frame_index] = 0;
+		mCounts[frame_index] = 0;
 
 		vkCmdResetQueryPool(cmd.Get(), mPools[frame_index], 0, scNumMarkers);
 
@@ -186,10 +185,15 @@ public:
 		}
 
 		const uint32 index = static_cast<uint32>(marker);
+		uint32& count = mCounts[mCurrentFrame];
+
+		if (count >= scNumMarkers) {
+			return;
+		}
 
 		vkCmdWriteTimestamp(cmd.Get(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, mPools[mCurrentFrame], index);
 
-		mWritten[mCurrentFrame] |= (1U << index);
+		mOrder[mCurrentFrame][count++] = index;
 	}
 
 	double GetMs(eGpuMarker marker) const { return mAverages[static_cast<uint32>(marker)]; }
@@ -210,7 +214,9 @@ private:
 	bool mbEnabled = false;
 
 	VkQueryPool mPools[FramesInFlight] = {};
-	uint32 mWritten[FramesInFlight] = {};
+	/// Markers of each frame slot, in the order they were written; each one's query is its enum value
+	uint32 mOrder[FramesInFlight][scNumMarkers] = {};
+	uint32 mCounts[FramesInFlight] = {};
 	uint32 mCurrentFrame = 0;
 
 	double mMsPerTick = 0.0;

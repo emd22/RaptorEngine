@@ -57,6 +57,11 @@ void World::Create()
 	pCVarGIHysteresis = gCVars->Set<float32>("r_gi_hysteresis", 0.97f);
 	pCVarGIBounce = gCVars->Set<int64>("r_gi_bounce", 1);
 	pCVarGIRelocate = gCVars->Set<int64>("r_gi_relocate", 1);
+	pCVarGIRayLength = gCVars->Set<float32>("r_gi_ray_length", 30.0f);
+	// Probes near a light that changed are traced first and blended faster for a few updates
+	pCVarGIDirty = gCVars->Set<int64>("r_gi_dirty", 1);
+	// Probes the compiled map marks as inside brushes or outside the map are never traced
+	pCVarGIProbeMask = gCVars->Set<int64>("r_gi_probe_mask", 1);
 }
 
 static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->IsTransparent()); }
@@ -1053,6 +1058,28 @@ void World::AddUnculledLightsToLightList()
 	}
 }
 
+bool World::IsClipmapGIUpdating() const
+{
+	return pCVarSDFPages->IntValue != 0 && (pCVarGIClipmap->IntValue != 0 || pCVarGIMode->IntValue == 1);
+}
+
+void World::AddGILightsToLightList(const FVec3& center)
+{
+	// The probes around the camera see surfaces the camera does not, so the lights on those are kept even where the
+	// frustum or the portals culled them. Otherwise their bounced light would come and go as the camera turns.
+	const float32 reach = pCVarGIRayLength->FloatValue;
+
+	for (LightBase* light : gLightManager->GetCache()) {
+		if (!light->bEnabled || !light->IsCullable() || mLightList.Contains(light->ID)) {
+			continue;
+		}
+
+		if (light->GetPosition().DistanceTo(center) <= light->GetRadius() + reach) {
+			mLightList.AddLight(light->ID);
+		}
+	}
+}
+
 void World::CullWorldTiles(const PerspectiveCamera& cam)
 {
 	gObjectManager->FlushInstanceUpdates();
@@ -1150,6 +1177,10 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 	AddTileToRenderList(false, WorldGrid::scGlobalTileIndex, object_frustum, portals);
 
 	AddUnculledLightsToLightList();
+
+	if (IsClipmapGIUpdating()) {
+		AddGILightsToLightList(cam.GetPosition());
+	}
 }
 
 
@@ -1206,6 +1237,10 @@ void World::Render(BaseCamera* shadow_camera)
 					.bDirectional = (light->Type == eLightType::Directional),
 					.Position = light->GetPosition(),
 					.Radius = light->GetRadius(),
+					.ID = light->ID.GetID(),
+					.Rotation = { light->mRotation.X, light->mRotation.Y, light->mRotation.Z, light->mRotation.W },
+					.Intensity = light->Intensity,
+					.Color = light->LightColor.AsUInt(),
 				});
 			}
 		}
@@ -1280,6 +1315,15 @@ void World::Render(BaseCamera* shadow_camera)
 		settings.Hysteresis = std::clamp(pCVarGIHysteresis->FloatValue, 0.0f, 0.999f);
 		settings.bBounce = (pCVarGIBounce->IntValue != 0);
 		settings.bRelocate = (pCVarGIRelocate->IntValue != 0);
+		settings.bUseMask = (pCVarGIProbeMask->IntValue != 0);
+
+		for (float32& ray_length : settings.RayLengths) {
+			ray_length = std::clamp(pCVarGIRayLength->FloatValue, 1.0f, 200.0f);
+		}
+
+		if (pCVarGIDirty->IntValue != 0) {
+			gGraphics->GIClipmap.TrackLights(gGraphics->ShadeLights);
+		}
 
 		gGraphics->GIClipmap.Update(gGraphics->GetFrame()->CmdBuffer, camera.GetPosition(), settings);
 		gGraphics->MarkGpu(eGpuMarker::GIClipmap);
