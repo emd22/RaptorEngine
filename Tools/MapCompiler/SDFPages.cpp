@@ -50,48 +50,6 @@ int32 KeyCoord(uint64 key, uint32 shift)
 	return static_cast<int32>(static_cast<int64>((key >> shift) & scKeyMask) - scKeyBias);
 }
 
-/// Separating axis test of a triangle against an axis aligned box (Akenine-Möller)
-// bool TriangleOverlapsBox(const Triangle& triangle, const DVec3 center, double half_size)
-// {
-// 	const DVec3 v0 = (triangle.Corners[0] - center);
-// 	const DVec3 v1 = (triangle.Corners[1] - center);
-// 	const DVec3 v2 = (triangle.Corners[2] - center);
-//
-// 	const DVec3 edges[3] = { (v1 - v0), (v2 - v1), (v0 - v2) };
-// 	const DVec3 axes[3] = { DVec3 { 1.0, 0.0, 0.0 }, DVec3 { 0.0, 1.0, 0.0 }, DVec3 { 0.0, 0.0, 1.0 } };
-//
-// 	for (const DVec3 edge : edges) {
-// 		for (const DVec3 box_axis : axes) {
-// 			const DVec3 axis = box_axis.Cross(edge);
-//
-// 			const double p0 = v0.Dot(axis);
-// 			const double p1 = v1.Dot(axis);
-// 			const double p2 = v2.Dot(axis);
-//
-// 			const double radius = half_size * (std::abs(axis.X) + std::abs(axis.Y) + std::abs(axis.Z));
-//
-// 			if (std::min({ p0, p1, p2 }) > radius || std::max({ p0, p1, p2 }) < -radius) {
-// 				return false;
-// 			}
-// 		}
-// 	}
-//
-// 	for (uint32 axis = 0; axis < 3; axis++) {
-// 		const double low = std::min({ v0[axis], v1[axis], v2[axis] });
-// 		const double high = std::max({ v0[axis], v1[axis], v2[axis] });
-//
-// 		if (low > half_size || high < -half_size) {
-// 			return false;
-// 		}
-// 	}
-//
-// 	const DVec3 normal = edges[0].Cross(edges[1]);
-// 	const double distance = normal.Dot(v0);
-// 	const double radius = half_size * (std::abs(normal.X) + std::abs(normal.Y) + std::abs(normal.Z));
-//
-// 	return std::abs(distance) <= radius;
-// }
-
 /// Albedo of the triangles that no material is known for, the same default the bake uses
 constexpr float32 scDefaultAlbedo = 0.5f;
 
@@ -184,8 +142,8 @@ void GatherTriangles(const MapSource& source, const SurfaceBuilder& surfaces, co
 	const uint32 blocker_albedo = PackAlbedo(FVec3(0.0f));
 
 	for (size_t index = 0; index + 2 < surfaces.BlockerPoints.Size; index += 3) {
-		AddTriangle(out_triangles, out_albedos, blocker_albedo, (surfaces.BlockerPoints[index]), (surfaces.BlockerPoints[index + 1]),
-					(surfaces.BlockerPoints[index + 2]));
+		AddTriangle(out_triangles, out_albedos, blocker_albedo, (surfaces.BlockerPoints[index]),
+					(surfaces.BlockerPoints[index + 1]), (surfaces.BlockerPoints[index + 2]));
 	}
 }
 
@@ -224,26 +182,11 @@ void BuildLevel(const Array<DTriangle>& triangles, double sdf_page_size, double 
 			high[2] = static_cast<int64>(std::floor((std::max({ v0, v1, v2 }) + margin) / sdf_page_size));
 		}
 
-		// 		for (uint32 axis = 0; axis < 3; axis++) {
-		// 			const double min_value = std::min(
-		// 				{ triangle.Points[0][axis], triangle.Points[1][axis], triangle.Points[2][axis] });
-		//
-		// 			const double max_value = std::max(
-		// 				{ triangle.Points[0][axis], triangle.Points[1][axis], triangle.Points[2][axis] });
-		//
-		// 			low[axis] = static_cast<int64>(std::floor((min_value - margin) / sdf_page_size));
-		// 			high[axis] = static_cast<int64>(std::floor((max_value + margin) / sdf_page_size));
-		// 		}
-
 		for (int64 x = low[0]; x <= high[0]; x++) {
 			for (int64 y = low[1]; y <= high[1]; y++) {
 				for (int64 z = low[2]; z <= high[2]; z++) {
 					const DVec3 xyz = DVec3(static_cast<double>(x), static_cast<double>(y), static_cast<double>(z));
 					const DVec3 center = (xyz + DVec3(0.5)) * DVec3(sdf_page_size);
-
-					// const DVec3 center { (static_cast<double>(x) + 0.5) * sdf_page_size,
-					// 					 (static_cast<double>(y) + 0.5) * sdf_page_size,
-					// 					 (static_cast<double>(z) + 0.5) * sdf_page_size };
 
 					if (triangle.OverlapsBox(center, half_size)) {
 						out_refs.Insert(SDFPageRef { MakeKey(x, y, z), triangle_index });
@@ -349,6 +292,7 @@ void BuildSDFPages(const MapSource& source, const SurfaceBuilder& surfaces, cons
 		for (uint32 page = packed_level.FirstSDFPage; page < pages.SDFPages.Size; page++) {
 			out_stats.MaxRefsPerPage = std::max(out_stats.MaxRefsPerPage, pages.SDFPages[page].RefCount);
 		}
+
 		out_stats.SDFPageCounts[level] = packed_level.SDFPageCount;
 	}
 

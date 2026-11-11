@@ -17,7 +17,6 @@
 #define SDF_PAGE_NEAREST_BLOCK 2
 #define SDF_PAGE_NEAREST_SIZE (SDF_PAGE_TEXELS / SDF_PAGE_NEAREST_BLOCK)
 
-/// Mirrors CompiledMapSDFPageTriangle in Src/Map/CompiledMap.hpp
 struct SDFPageTriangle
 {
 	/// W is the linear albedo as RGB8, red in the low byte

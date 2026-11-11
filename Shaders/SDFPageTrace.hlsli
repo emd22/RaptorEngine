@@ -3,10 +3,6 @@
 
 #include "SDFPageCommon.hlsli"
 
-// Needs bSDFPageIndirection (StructuredBuffer<uint>), tSDFPageAtlas (F_Texture3D) and SDF_PAGE_SCENE, the SDFPageScene in the
-// shader's constants, declared by the including shader. The scene is read from the constants in place: a copy of it
-// indexed by level would live in slow per-thread memory.
-
 #define SDF_PAGE_MAX_STEPS 256
 /// A ray hits once it is closer than this many texels of its level, since an unsigned field never reaches zero
 /// between its texels
@@ -115,10 +111,6 @@ uint SDFPageConeLevel(float distance, float cone_slope)
 	return uint(min(level, float(SDF_PAGE_SCENE.vInfo.x - 1)));
 }
 
-/**
- * Sphere traces the pages. A non-zero `cone_slope` moves to coarser levels as the ray gets longer, so a ray stands in
- * for a cone of that width: surfaces get thicker and steps longer with distance.
- */
 SDFPageHit SDFPageTrace(float3 origin, float3 direction, float max_distance, float cone_slope)
 {
 	SDFPageHit hit;

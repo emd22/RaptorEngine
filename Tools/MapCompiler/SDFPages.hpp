@@ -32,17 +32,16 @@ struct SDFPageStats
 	uint32 LevelCount = 0;
 	uint32 SDFPageCounts[CompiledMapSDFPages::scMaxLevels] = {};
 	uint64 RefCount = 0;
-	/// Pages with more refs than fit the 8 bit nearest triangle index fall back to the default albedo past it
 	uint32 MaxRefsPerPage = 0;
 	uint64 ByteCount = 0;
 	double Seconds = 0.0;
 };
 
 /**
- * @brief Builds `out_map.SDFPages` from the opaque compiled surfaces, the nonvis blockers and the baked models: the same
- * triangles the indirect bake traces against
+ * @brief Builds `out_map.SDFPages` from the opaque compiled surfaces, the nonvis blockers and the baked models: the
+ * same triangles the indirect bake traces against
  */
 void BuildSDFPages(const MapSource& source, const SurfaceBuilder& surfaces, const ModelBuilder* models,
-				 const SDFPageOptions& options, CompiledMap& out_map, SDFPageStats& out_stats);
+				   const SDFPageOptions& options, CompiledMap& out_map, SDFPageStats& out_stats);
 
 } // namespace fx::mapc

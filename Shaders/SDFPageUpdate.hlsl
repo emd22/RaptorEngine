@@ -47,6 +47,7 @@ float TriangleDistanceSq(float3 p, float3 a, float3 b, float3 c)
 	const float3 pb = p - b;
 	const float3 ac = a - c;
 	const float3 pc = p - c;
+
 	const float3 normal = cross(ba, ac);
 
 	const float sides = sign(dot(cross(ba, normal), pa)) + sign(dot(cross(cb, normal), pb)) +

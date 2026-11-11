@@ -69,15 +69,6 @@ F_FrameData(SDFPageDebugConsts, Consts, 1);
 #define VIEW_PROBE_SHADE 10
 #define PROBE_SIZE 8
 
-#define STAT_MATCH 0
-#define STAT_EARLY 1
-#define STAT_LATE 2
-#define STAT_SKY 3
-#define STAT_SKIPPED 4
-#define STAT_STEPS 5
-#define STAT_RAYS 6
-#define STAT_MAX_STEPS 7
-
 #define PRIMARY_MAX_DISTANCE 500.0
 #define GI_MAX_DISTANCE 50.0
 /// Stored depths at or above this are the view model, see VIEWMODEL_DEPTH_SCALE in SSAO.hlsl
@@ -110,8 +101,10 @@ float3 CosineDirection(float3 normal, float2 xi)
 {
 	// Branchless orthonormal basis (Duff et al. 2017)
 	const float sign_z = select(normal.z >= 0.0, 1.0, -1.0);
+
 	const float a = -1.0 / (sign_z + normal.z);
 	const float b = normal.x * normal.y * a;
+
 	const float3 tangent = float3(1.0 + sign_z * normal.x * normal.x * a, sign_z * b, -sign_z * normal.x);
 	const float3 bitangent = float3(b, sign_z + normal.y * normal.y * a, -normal.y);
 
@@ -136,20 +129,6 @@ float3 LevelColour(uint level)
 	return scColours[min(level, SDF_PAGE_MAX_LEVELS - 1)];
 }
 
-#define STAT_COUNT 8
-
-/// This thread's counts, summed over the wave before one atomic per counter, so the counting costs little next to the
-/// tracing it measures
-static uint sStats[STAT_COUNT];
-
-void AddStat(uint stat, uint value) { sStats[stat] += value; }
-
-void RecordSteps(SDFPageHit hit)
-{
-	AddStat(STAT_STEPS, hit.uiSteps);
-	AddStat(STAT_RAYS, 1u);
-	AddStat(STAT_MAX_STEPS, select(hit.uiSteps >= SDF_PAGE_MAX_STEPS, 1u, 0u));
-}
 
 float3 ShadePixel(uint2 pixel, uint2 group, uint2 local)
 {
@@ -182,13 +161,15 @@ float3 ShadePixel(uint2 pixel, uint2 group, uint2 local)
 
 		const bool is_probe = or(view == VIEW_PROBE_RAYS, view == VIEW_PROBE_SHADE);
 		const uint group_columns = (Consts.vInfo.x + PROBE_SIZE - 1) / PROBE_SIZE;
-		// Every probe stride'th probe traces, so a run can trace a given number of rays
+
 		const bool is_skipped = and(is_probe, ((group.x + group.y * group_columns) % max(Consts.vLights.z, 1u)) != 0);
+
 		const uint2 origin_pixel = select(is_probe, min(group_pixel, Consts.vInfo.xy - 1), pixel);
 		const float2 origin_uv = (float2(origin_pixel) + 0.5) / float2(Consts.vInfo.xy);
 		const float origin_depth = F_SampleLoad(tDepth, int3(origin_pixel, 0)).r;
 		const float3 origin_surface = WorldFromDepth(origin_uv, origin_depth);
 		const float4 origin_normal = F_SampleLoad(tNormal, int3(origin_pixel, 0));
+
 		const float ray_length = Consts.vParams.y;
 
 		// The skybox is far outside the pages, where its depth gives no usable position
@@ -206,8 +187,6 @@ float3 ShadePixel(uint2 pixel, uint2 group, uint2 local)
 			const float3 origin = origin_surface + normal * (SDFPageTexelAt(origin_surface) * 1.5);
 
 			const SDFPageHit hit = SDFPageTrace(origin, direction, ray_length, Consts.vParams.x);
-			RecordSteps(hit);
-
 			const float visibility = select(hit.bHit, saturate(hit.fDistance / GI_AO_DISTANCE), 1.0);
 
 			colour = visibility.xxx;
@@ -237,7 +216,6 @@ float3 ShadePixel(uint2 pixel, uint2 group, uint2 local)
 	}
 	else {
 		const SDFPageHit hit = SDFPageTrace(eye, view_direction, PRIMARY_MAX_DISTANCE, 0.0);
-		RecordSteps(hit);
 
 		if (view == VIEW_STEPS) {
 			colour = HeatColour(float(hit.uiSteps) / 96.0);
@@ -261,29 +239,19 @@ float3 ShadePixel(uint2 pixel, uint2 group, uint2 local)
 			const float tolerance = texel * 3.0 + depth_distance * 0.01;
 			const float error = hit.fDistance - depth_distance;
 
-			uint stat = STAT_MATCH;
 			colour = float3(0.1, 0.7, 0.2);
 
 			if (is_view_model) {
-				stat = STAT_SKIPPED;
 				colour = float3(0.2, 0.2, 0.2);
 			}
 			else if (is_sky) {
-				stat = select(hit.bHit, STAT_EARLY, STAT_SKY);
 				colour = select(hit.bHit, float3(1.0, 0.1, 0.1), scSkyColour);
 			}
 			else if (!hit.bHit || error > tolerance) {
-				stat = STAT_LATE;
 				colour = float3(0.1, 0.2, 1.0);
 			}
 			else if (error < -tolerance) {
-				stat = STAT_EARLY;
 				colour = float3(1.0, 0.1, 0.1);
-			}
-
-			[unroll]
-			for (uint index = STAT_MATCH; index <= STAT_SKIPPED; index++) {
-				AddStat(index, select(stat == index, 1u, 0u));
 			}
 		}
 	}
@@ -296,21 +264,7 @@ void main(uint3 thread : SV_DispatchThreadID, uint3 group : SV_GroupID, uint3 lo
 {
 	const uint2 pixel = thread.xy;
 
-	[unroll]
-	for (uint stat = 0; stat < STAT_COUNT; stat++) {
-		sStats[stat] = 0;
-	}
-
 	if (all(pixel < Consts.vInfo.xy)) {
 		tOutput[pixel] = float4(ShadePixel(pixel, group.xy, local.xy), 1.0);
 	}
-//
-// 	[unroll]
-// 	for (uint stat = 0; stat < STAT_COUNT; stat++) {
-// 		const uint sum = WaveActiveSum(sStats[stat]);
-//
-// 		if (WaveIsFirstLane()) {
-// 			InterlockedAdd(bStats[stat], sum);
-// 		}
-// 	}
 }

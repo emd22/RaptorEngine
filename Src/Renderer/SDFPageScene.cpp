@@ -320,7 +320,7 @@ bool SDFPageScene::Upload(const CompiledMapSDFPages& pages)
 		total_sdf_pages += mLevels[level_index].SDFPageCount;
 	}
 
-	LogInfo(LC_RENDER, "SDF page scene: {} levels, {} pages, {} triangles ({:.1f} MB)", mLevelCount, total_sdf_pages,
+	LogInfo(LC_RENDER, "SDF Page Scene {} levels, {} pages, {} triangles ({:.1f} MB)", mLevelCount, total_sdf_pages,
 			pages.Triangles.Size,
 			static_cast<double>(pages.Triangles.GetSizeInBytes() + pages.Refs.GetSizeInBytes()) / (1024.0 * 1024.0));
 
@@ -713,25 +713,30 @@ void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 		consts.BakedSun = gGraphics->GetBakedSunShadowGpu();
 	}
 
-	Image* lit = &gGraphics->pRenderer->ForwardPass.GetTarget(eImageFormat::RGBA16_Float)->GetImage();
+	Target* lit_target = gGraphics->pRenderer->ForwardPass.GetTarget(eImageFormat::RGBA16_Float);
+	Assert(lit_target != nullptr);
 
-	ComputeBarrier(cmd);
-	BarrierHelper::ImageBeginComputeWrite(cmd, lit);
+	Image* lit_image = &lit_target->GetImage();
 
-	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, gGraphics->LightBuffer.GetBaseOffset());
-	gPipelineCache->AddBufferOffset(0, 0);
+	{
+		ComputeBarrier(cmd);
+		BarrierHelper::ImageBeginComputeWrite(cmd, lit_image);
 
-	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
-	gPipelineCache->Bind(ePipelineName::SDFPageDebug, cmd);
+		gPipelineCache->AddBufferOffset(0, 0);
+		gPipelineCache->AddBufferOffset(0, 0);
+		gPipelineCache->AddBufferOffset(0, 0);
+		gPipelineCache->AddBufferOffset(0, 0);
+		gPipelineCache->AddBufferOffset(0, gGraphics->LightBuffer.GetBaseOffset());
+		gPipelineCache->AddBufferOffset(0, 0);
 
-	vkCmdDispatch(cmd.Get(), (extent.X + scDebugGroupSize - 1) / scDebugGroupSize,
-				  (extent.Y + scDebugGroupSize - 1) / scDebugGroupSize, 1);
+		gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
+		gPipelineCache->Bind(ePipelineName::SDFPageDebug, cmd);
 
-	BarrierHelper::ImageComputeWriteToRead(cmd, lit);
+		vkCmdDispatch(cmd.Get(), (extent.X + scDebugGroupSize - 1) / scDebugGroupSize,
+					  (extent.Y + scDebugGroupSize - 1) / scDebugGroupSize, 1);
+
+		BarrierHelper::ImageComputeWriteToRead(cmd, lit_image);
+	}
 }
 
 } // namespace fx::renderer

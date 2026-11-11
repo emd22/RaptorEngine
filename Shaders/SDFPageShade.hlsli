@@ -4,10 +4,6 @@
 #include "SDFPageTrace.hlsli"
 #include "BakedSunShadow.hlsli"
 
-// Lights the hits of SDFPageTrace(). Needs, besides what SDFPageTrace.hlsli and BakedSunShadow.hlsli need: bTriangles
-// (StructuredBuffer<SDFPageTriangle>), bRefs and bAtlasFirstRef (StructuredBuffer<uint>), tNearest (a Texture3D<uint>
-// declared the F_Texture3D way), Lights (the light buffer) and tShadowAtlas (comparison), declared by the including
-// shader.
 
 /// Mirrors scShadeMaxLights in Src/Renderer/SDFPageScene.hpp
 #define SHADE_MAX_LIGHTS 4
