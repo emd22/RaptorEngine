@@ -17,6 +17,9 @@ enum class eObjectTag : uint32
 	Trigger = (1 << 5),
 	Decal = (1 << 8),
 	Patch = (1 << 9),
+	/// Moves at runtime and still blocks and bounces the GI: traced as boxes by the probes, kept out of the map
+	/// compiler's static bake
+	DynamicGI = (1 << 10),
 };
 
 FxEnumFlags(eObjectTag);

@@ -2346,6 +2346,10 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 		object->SetTag(eObjectTag::Trigger);
 	}
 
+	if (entry.GetMemberValue(HashStr32("dynamicgi"), 0) == 1) {
+		object->SetTag(eObjectTag::DynamicGI);
+	}
+
 	if (IsDecalEntry(entry)) {
 		object->SetTag(eObjectTag::Decal);
 	}
@@ -2530,6 +2534,10 @@ Object* Blockout::DupeObject(Object* object)
 
 	if (object->IsTrigger()) {
 		dupe->SetTag(eObjectTag::Trigger);
+	}
+
+	if (object->IsDynamicGI()) {
+		dupe->SetTag(eObjectTag::DynamicGI);
 	}
 
 	if (object->IsDecal()) {
@@ -3051,6 +3059,7 @@ void Blockout::ApplyModelProperties(Object& object, Model& model, const ConfigEn
 
 	apply_tag("lock", eObjectTag::LockTransform);
 	apply_tag("spawn", eObjectTag::Spawn);
+	apply_tag("dynamicgi", eObjectTag::DynamicGI);
 
 	ReadScriptEntry(&object, entry);
 
@@ -3212,6 +3221,10 @@ void Blockout::SaveModels(ConfigFile& info)
 			model_entry.AddMember(ConfigEntry::Literal("spawn", 1));
 		}
 
+		if (object->IsDynamicGI()) {
+			model_entry.AddMember(ConfigEntry::Literal("dynamicgi", 1));
+		}
+
 		WriteScriptEntry(model_entry, object);
 
 		if (!model.ColliderName.IsEmpty()) {
@@ -3252,6 +3265,10 @@ ConfigEntry Blockout::MakeBrushEntry(Object* object, const String& name, const B
 
 		if (object->IsSpawn()) {
 			blockout_entry.AddMember(ConfigEntry::Literal("spawn", 1));
+		}
+
+		if (object->IsDynamicGI()) {
+			blockout_entry.AddMember(ConfigEntry::Literal("dynamicgi", 1));
 		}
 
 		if (!object->IsShadowCaster() && !object->IsVolume() && !object->IsDecal()) {

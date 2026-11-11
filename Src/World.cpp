@@ -57,6 +57,8 @@ void World::Create()
 	pCVarGIDirty = gCVars->Set<int64>("r_gi_dirty", 1);
 	// Probes the compiled map marks as inside brushes or outside the map are never traced
 	pCVarGIProbeMask = gCVars->Set<int64>("r_gi_probe_mask", 1);
+	// Objects tagged DynamicGI block and bounce the GI as boxes
+	pCVarGIDynamic = gCVars->Set<int64>("r_gi_dynamic", 1);
 }
 
 static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->IsTransparent()); }
@@ -1287,6 +1289,8 @@ void World::Render(BaseCamera* shadow_camera)
 			gGraphics->GIClipmap.TrackLights(gGraphics->ShadeLights);
 		}
 
+		UpdateDynamicGIProxies(gi_center);
+
 		gGraphics->GIClipmap.Update(gGraphics->GetFrame()->CmdBuffer, gi_center, settings);
 		gGraphics->MarkGpu(eGpuMarker::GIClipmap);
 
@@ -1458,6 +1462,135 @@ void World::RenderProbeCapture()
 
 	gGraphics->pRenderer->mLightTileColumns = saved_tile_columns;
 	gGraphics->pRenderer->mLightTileRows = saved_tile_rows;
+}
+
+/**
+ * The mean albedo a box made from `object` bounces with. Textures are not read back, so a textured material counts as
+ * mid grey times its colour factor.
+ */
+static FVec3 GetDynamicGIAlbedo(const Object& object)
+{
+	constexpr float32 scTexturedAlbedo = 0.5f;
+	constexpr float32 scMaxAlbedo = 0.9f;
+
+	const Material* material = MaterialManagerFwd::GetMaterial(object.GetMaterialID());
+
+	if (material == nullptr) {
+		return FVec3(scTexturedAlbedo);
+	}
+
+	float32 scale = 1.0f;
+
+	if (material->Diffuse.Exists()) {
+		scale = scTexturedAlbedo;
+	}
+
+	const float32* factor = material->Properties.BaseColorFactor;
+
+	return FVec3(std::min(factor[0] * scale, scMaxAlbedo), std::min(factor[1] * scale, scMaxAlbedo),
+				 std::min(factor[2] * scale, scMaxAlbedo));
+}
+
+static bool HasDynamicGIAncestor(const Object& object)
+{
+	const Object* parent = gObjectManager->GetObject(object.ParentID);
+
+	while (parent != nullptr) {
+		if (parent->IsDynamicGI()) {
+			return true;
+		}
+
+		parent = gObjectManager->GetObject(parent->ParentID);
+	}
+
+	return false;
+}
+
+/// Adds a box around each mesh of `object` and of the nodes attached to it
+static void AddDynamicGIProxies(Object& object, SizedArray<DynamicGIProxy>& out_proxies)
+{
+	constexpr float32 scMinExtent = 1e-3f;
+
+	if (object.IsHidden()) {
+		return;
+	}
+
+	if (object.pMesh.IsValid() && out_proxies.Size < out_proxies.Capacity) {
+		const FMat4& world = object.GetWorldMatrix();
+		const FVec3 local_center = (object.Bounds.Min + object.Bounds.Max) * 0.5f;
+		const FVec3 local_half = (object.Bounds.Max - object.Bounds.Min) * 0.5f;
+		const float32 local_center_lanes[3] = { local_center.X, local_center.Y, local_center.Z };
+		const float32 local_half_lanes[3] = { local_half.X, local_half.Y, local_half.Z };
+
+		DynamicGIProxy proxy;
+		proxy.ID = object.ID.GetID();
+		proxy.Albedo = GetDynamicGIAlbedo(object);
+
+		// Rows are the scaled local axes, then the translation
+		proxy.Center = FVec3(world.Rows[3].X, world.Rows[3].Y, world.Rows[3].Z);
+
+		float32 half_lanes[3] = {};
+		bool is_degenerate = false;
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			const FVec3 row(world.Rows[axis].X, world.Rows[axis].Y, world.Rows[axis].Z);
+			const float32 length = row.Length();
+
+			proxy.Center = proxy.Center + row * local_center_lanes[axis];
+			half_lanes[axis] = local_half_lanes[axis] * length;
+			is_degenerate = is_degenerate || (length < scMinExtent);
+
+			if (length >= scMinExtent) {
+				proxy.Axes[axis] = row * (1.0f / length);
+			}
+		}
+
+		proxy.HalfExtents = FVec3(half_lanes[0], half_lanes[1], half_lanes[2]);
+
+		const bool is_empty = half_lanes[0] < scMinExtent && half_lanes[1] < scMinExtent && half_lanes[2] < scMinExtent;
+
+		if (!is_degenerate && !is_empty) {
+			out_proxies.Insert(proxy);
+		}
+	}
+
+	for (ObjectID attached_id : object.AttachedNodes) {
+		Object* attached = gObjectManager->GetObject(attached_id);
+
+		if (attached != nullptr) {
+			AddDynamicGIProxies(*attached, out_proxies);
+		}
+	}
+}
+
+void World::UpdateDynamicGIProxies(const FVec3& center)
+{
+	constexpr uint32 scMaxCandidates = 256;
+
+	if (!mDynamicGIProxies.IsInited()) {
+		mDynamicGIProxies.InitCapacity(scMaxCandidates);
+	}
+
+	mDynamicGIProxies.Clear();
+
+	if (pCVarGIDynamic->IntValue != 0) {
+		for (Object& object : gObjectManager->GetCache()) {
+			if (!object.IsDynamicGI() || object.GetObjectLayer() == eObjectLayer::PlayerLayer ||
+				HasDynamicGIAncestor(object)) {
+				continue;
+			}
+
+			AddDynamicGIProxies(object, mDynamicGIProxies);
+		}
+	}
+
+	if (mDynamicGIProxies.Size > ProbeClipmap::scMaxProxies) {
+		std::partial_sort(mDynamicGIProxies.begin(), mDynamicGIProxies.begin() + ProbeClipmap::scMaxProxies,
+						  mDynamicGIProxies.end(), [&](const DynamicGIProxy& a, const DynamicGIProxy& b)
+						  { return a.Center.DistanceTo(center) < b.Center.DistanceTo(center); });
+	}
+
+	gGraphics->GIClipmap.SetDynamicProxies(mDynamicGIProxies, pCVarGIDirty->IntValue != 0);
 }
 
 void World::DebugDrawObjectBounds()

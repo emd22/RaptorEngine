@@ -18,7 +18,7 @@ namespace editor {
 
 static constexpr eObjectTag scEditableTags[] = {
 	eObjectTag::LockTransform, eObjectTag::ProbeVolume, eObjectTag::ReflectionProbe,
-	eObjectTag::Spawn,		   eObjectTag::Trigger,
+	eObjectTag::Spawn,		   eObjectTag::Trigger,		 eObjectTag::DynamicGI,
 };
 
 static constexpr eObjectFlags scEditableFlags[] = {
@@ -37,6 +37,7 @@ bool CanEditObjectTag(const Object* object, eObjectTag tag)
 	switch (tag) {
 	case eObjectTag::LockTransform:
 	case eObjectTag::Spawn:
+	case eObjectTag::DynamicGI:
 		return true;
 	case eObjectTag::ProbeVolume:
 	case eObjectTag::ReflectionProbe:

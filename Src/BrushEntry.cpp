@@ -539,7 +539,7 @@ ConfigEntry PlaceSubviewBrushEntry(ConfigEntry& brush_entry, const String& name,
 bool IsEntityBrushEntry(const ConfigEntry& entry)
 {
 	static constexpr const char* scEntityBrushMembers[] = {
-		"dynamic", "probevolume", "reflectionprobe", "spawn", "trigger", scDecalName,
+		"dynamic", "dynamicgi", "probevolume", "reflectionprobe", "spawn", "trigger", scDecalName,
 	};
 
 	for (const char* member : scEntityBrushMembers) {
@@ -775,6 +775,7 @@ bool IsBakedModelEntry(const ConfigEntry& model, const ConfigEntry* brushes)
 
 	if (model.GetMemberValue(HashStr32("shadows"), 0) == 0 || model.GetMemberValue(HashStr32("unlit"), 0) != 0 ||
 		model.GetMemberValue(HashStr32("spawn"), 0) != 0 || model.GetMemberValue(HashStr32("nobake"), 0) != 0 ||
+		model.GetMemberValue(HashStr32("dynamicgi"), 0) != 0 ||
 		model.GetMember(HashStr32("script")) != nullptr) {
 		return false;
 	}

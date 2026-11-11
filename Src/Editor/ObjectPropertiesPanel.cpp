@@ -77,6 +77,9 @@ static constexpr FlagName<eObjectTag> scTagNames[] = {
 	  "Blockout brushes only. Calls object_trigger_enter and object_trigger_exit in the object's script when the "
 	  "player enters and leaves it" },
 	{ eObjectTag::Patch, "Patch", "Marks a curve patch. Set when the patch is created" },
+	{ eObjectTag::DynamicGI, "Dynamic GI",
+	  "Blocks and bounces the GI as a box wherever it moves. Kept out of the compiled map's static GI and shadows, so "
+	  "the map needs compiling again" },
 };
 
 static constexpr FlagName<eObjectFlags> scFlagNames[] = {

@@ -14,6 +14,7 @@
 #include <Renderer/FogSettings.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/LightList.hpp>
+#include <Renderer/ProbeClipmap.hpp>
 #include <Renderer/RenderList.hpp>
 #include <functional>
 
@@ -154,6 +155,8 @@ private:
 	void AddGILightsToLightList(const FVec3& center);
 	/// Where the SDF pages and the GI probes are centred this frame
 	FVec3 GetGICenter(const BaseCamera& camera) const;
+	/// Hands the GI probes the boxes of the objects tagged DynamicGI nearest `center`
+	void UpdateDynamicGIProxies(const FVec3& center);
 	void ClearRenderList();
 
 	void AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID* id);
@@ -233,6 +236,7 @@ public:
 	CVarValue* pCVarGIRayLength = nullptr;
 	CVarValue* pCVarGIDirty = nullptr;
 	CVarValue* pCVarGIProbeMask = nullptr;
+	CVarValue* pCVarGIDynamic = nullptr;
 
 	uint32 FrustumTestedObjects = 0;
 	uint32 FrustumCulledObjects = 0;
@@ -271,6 +275,9 @@ private:
 
 	SizedArray<TileIndex> mVisibleTiles;
 	uint64 mCullSerial = 0;
+
+	/// Every box of the objects tagged DynamicGI this frame, before the nearest are kept
+	SizedArray<renderer::DynamicGIProxy> mDynamicGIProxies;
 };
 
 } // namespace fx

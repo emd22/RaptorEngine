@@ -273,8 +273,6 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		float3 closest_back_direction = float3(0.0, 0.0, 0.0);
 		float closest_front = 1e30;
 		float3 closest_front_direction = float3(0.0, 0.0, 0.0);
-		float farthest_front = 0.0;
-		float3 farthest_front_direction = float3(0.0, 0.0, 0.0);
 
 		for (uint ray = 0; ray < CLIPMAP_RAYS; ray++) {
 			const float signed_distance = sRays[ray].w;
@@ -289,16 +287,9 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 					closest_back_direction = direction;
 				}
 			}
-			else {
-				if (distance < closest_front) {
-					closest_front = distance;
-					closest_front_direction = direction;
-				}
-
-				if (distance > farthest_front) {
-					farthest_front = distance;
-					farthest_front_direction = direction;
-				}
+			else if (distance < closest_front) {
+				closest_front = distance;
+				closest_front_direction = direction;
 			}
 		}
 
@@ -306,19 +297,27 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		const float backface_ratio = float(backface_count) / float(CLIPMAP_RAYS);
 
 		float3 offset = previous_offset;
+		bool is_near_front = false;
 
 		if (backface_ratio > CLIPMAP_RELOCATE_BACKFACES) {
 			// Inside a wall: through the nearest back face and a little past it
 			offset += closest_back_direction * (closest_back + min_front * 0.5);
 		}
 		else if (closest_front < min_front) {
-			// Too close to a surface: towards the open space, unless that is where the surface is
-			const bool is_open = dot(farthest_front_direction, closest_front_direction) <= 0.5;
-			offset += select(is_open, farthest_front_direction * min(farthest_front, spacing * 0.5), float3(0.0, 0.0, 0.0));
+			// Too close to a surface: straight away from it, just far enough. A probe left hugging a surface sees
+			// almost no depth in any direction, and shows as a dark dot on the surface right next to it.
+			offset -= closest_front_direction * (min_front - closest_front);
+			is_near_front = true;
 		}
 
-		const bool fits = all(abs(offset) <= CLIPMAP_MAX_OFFSET * spacing);
-		offset = select(relocate, select(fits, offset, previous_offset), float3(0.0, 0.0, 0.0));
+		// A move out of a wall that doesn't fit is dropped, as the probe would stay in the wall. A move off a surface
+		// is clamped instead, since any part of it helps.
+		const float max_offset = CLIPMAP_MAX_OFFSET * spacing;
+		const bool fits = all(abs(offset) <= max_offset);
+		const float3 clamped = clamp(offset, -max_offset, max_offset);
+
+		offset = select(fits, offset, select(is_near_front, clamped, previous_offset));
+		offset = select(relocate, offset, float3(0.0, 0.0, 0.0));
 
 		const bool is_active = or(!relocate, backface_ratio <= CLIPMAP_INACTIVE_BACKFACES);
 		const bool moved_far = any(abs(offset - previous_offset) > CLIPMAP_RESET_MOVE * spacing);

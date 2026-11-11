@@ -73,19 +73,40 @@ void main(uint3 group : SV_GroupID, uint ray : SV_GroupIndex)
 	const float ray_length = level.vParams.z;
 	const SDFPageHit hit = SDFPageTrace(origin, direction, ray_length, level.vParams.w);
 
+	// The boxes of the objects tagged DynamicGI, which move and so are not in the SDF pages. The nearest of them and
+	// the page hit is what the ray reached.
+	ClipmapProxyHit nearest;
+	nearest.fDistance = select(hit.bHit, hit.fDistance, ray_length);
+	nearest.vNormal = float3(0.0, 0.0, 0.0);
+	nearest.vAlbedo = float3(0.0, 0.0, 0.0);
+	nearest.bHit = false;
+
+	[loop]
+	for (uint proxy = 0; proxy < Consts.vInfo.w; proxy++) {
+		ClipmapTraceProxy(Consts.Proxies[proxy], origin, direction, nearest);
+	}
+
 	float3 radiance = Consts.vSkyRadiance.rgb;
 	float distance = ray_length;
 
-	if (hit.bHit) {
-		const float3 position = origin + direction * hit.fDistance;
-		const SDFPageTriangle page_triangle = SDFPageNearestTriangle(hit, position);
+	if (or(hit.bHit, nearest.bHit)) {
+		const float hit_distance = nearest.fDistance;
+		const float3 position = origin + direction * hit_distance;
 
-		const float3 face = normalize(cross(page_triangle.vB.xyz - page_triangle.vA.xyz,
-											page_triangle.vC.xyz - page_triangle.vA.xyz));
+		float3 face = nearest.vNormal;
+		float3 albedo = nearest.vAlbedo;
+
+		// Only a page hit has a triangle to look up, and a box hit has no page to look it up in
+		if (!nearest.bHit) {
+			const SDFPageTriangle page_triangle = SDFPageNearestTriangle(hit, position);
+
+			face = normalize(cross(page_triangle.vB.xyz - page_triangle.vA.xyz,
+								   page_triangle.vC.xyz - page_triangle.vA.xyz));
+			albedo = SDFPageTriangleAlbedo(page_triangle);
+		}
+
 		const bool is_backface = dot(face, direction) > 0.0;
 		const float3 normal = select(is_backface, -face, face);
-
-		const float3 albedo = SDFPageTriangleAlbedo(page_triangle);
 		const float angle = float(job_index * 64u + ray) * 2.39996323;
 		radiance = SDFPageShadeHit(position, normal, albedo, float2(cos(angle), sin(angle)), Consts.BakedSun,
 								   Consts.vLightIndices, Consts.vLights.x, Consts.vLights.y);
@@ -101,7 +122,7 @@ void main(uint3 group : SV_GroupID, uint ray : SV_GroupIndex)
 		radiance = select(is_backface, float3(0.0, 0.0, 0.0), radiance);
 
 		// Backfaces are kept as negative distances, for telling probes inside walls apart later
-		distance = select(is_backface, -hit.fDistance, hit.fDistance);
+		distance = select(is_backface, -hit_distance, hit_distance);
 	}
 
 	bRays[job_index * CLIPMAP_RAYS + ray] = float4(radiance, distance);

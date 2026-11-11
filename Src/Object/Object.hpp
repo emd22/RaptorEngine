@@ -166,6 +166,7 @@ public:
 	FX_FORCE_INLINE bool IsTrigger() const { return HasTags(eObjectTag::Trigger); }
 	FX_FORCE_INLINE bool IsDecal() const { return HasTags(eObjectTag::Decal); }
 	FX_FORCE_INLINE bool IsPatch() const { return HasTags(eObjectTag::Patch); }
+	FX_FORCE_INLINE bool IsDynamicGI() const { return HasTags(eObjectTag::DynamicGI); }
 
 	/// True if this object is a marker of some kind and not drawn as level geometry
 	FX_FORCE_INLINE bool IsVolume() const

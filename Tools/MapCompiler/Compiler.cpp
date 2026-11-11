@@ -160,9 +160,9 @@ void AddHulls(const PlaneSet& planes, const MapSource& source, CompiledMap& map)
 	}
 }
 
-/// Mirror ProbeClipmap::scLevelCount and scLevel0Spacing, and CLIPMAP_MAX_OFFSET in Shaders/ProbeClipmapCommon.hlsli
+/// Mirror ProbeClipmap::scLevelCount and scLevelSpacings, and CLIPMAP_MAX_OFFSET in Shaders/ProbeClipmapCommon.hlsli
 constexpr uint32 scProbeMaskLevels = 3;
-constexpr double scProbeMaskSpacing = 1.0;
+constexpr double scProbeMaskSpacings[scProbeMaskLevels] = { 0.5, 1.0, 4.0 };
 constexpr double scProbeMaskOffsets[2] = { 0.2, 0.4 };
 
 /**
@@ -205,7 +205,7 @@ void BuildProbeMask(const Bsp& bsp, const MapSource& source, bool sealed, Compil
 
 	for (uint32 level_index = 0; level_index < scProbeMaskLevels; level_index++) {
 		CompiledMapProbeMaskLevel& level = mask.Levels[level_index];
-		const double spacing = scProbeMaskSpacing * static_cast<double>(1U << level_index);
+		const double spacing = scProbeMaskSpacings[level_index];
 
 		level.Spacing = static_cast<float32>(spacing);
 		level.FirstWord = static_cast<uint32>(word_count);

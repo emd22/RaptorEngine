@@ -39,6 +39,7 @@ static constexpr TagName scTagNames[] = {
 	{ eObjectTag::Trigger, "Trigger" },
 	{ eObjectTag::Decal, "decal" },
 	{ eObjectTag::Patch, "patch" },
+	{ eObjectTag::DynamicGI, "Dynamic GI" },
 };
 
 static String BuildTagsList(eObjectTag tags)

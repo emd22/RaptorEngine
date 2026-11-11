@@ -35,6 +35,29 @@ struct ProbeClipmapLevelGpu
 	float32 Params[4] = {};
 };
 
+/// Laid out to match ClipmapProxy in Shaders/ProbeClipmapConsts.hlsli
+struct ProbeClipmapProxyGpu
+{
+	/// The box's unit axes, each with W = -dot(axis, centre), so a point's local coordinates are dot(axis, p) + W
+	float32 Axes[3][4] = {};
+	/// Half extents along the axes, then the albedo packed as RGB8
+	float32 Extents[4] = {};
+};
+
+/**
+ * @brief A box the probes trace besides the SDF pages, for a mesh of an object tagged DynamicGI. Its axes are unit
+ * length and orthogonal, and `HalfExtents` is in world units.
+ */
+struct DynamicGIProxy
+{
+	/// The object the box was made from, to follow it from frame to frame
+	uint32 ID = 0;
+	FVec3 Center = FVec3::sZero;
+	FVec3 Axes[3] = { FVec3::sRight, FVec3::sUp, FVec3::sForward };
+	FVec3 HalfExtents = FVec3::sZero;
+	FVec3 Albedo = FVec3(0.5f);
+};
+
 class ProbeClipmap
 {
 public:
@@ -54,7 +77,11 @@ public:
 	/// CLIPMAP_DIRTY_UPDATES in Shaders/ProbeClipmapConsts.hlsli, and has to fit the job's four dirty bits.
 	static constexpr uint32 scDirtyUpdates = 8;
 
-	static constexpr float32 scLevel0Spacing = 1.0f;
+	/// Probe spacing per level. Level 0 is dense and close around the camera, and level 1 bridges it to the coarse
+	/// level 2. Mirrored by scProbeMaskSpacings in Tools/MapCompiler/Compiler.cpp.
+	static constexpr float32 scLevelSpacings[scLevelCount] = { 0.5f, 1.0f, 4.0f };
+	/// Mirrors CLIPMAP_MAX_PROXIES in Shaders/ProbeClipmapConsts.hlsli
+	static constexpr uint32 scMaxProxies = 32;
 	static constexpr uint32 scMaxJobsPerFrame = 8192;
 
 	/// Sizes of one frame's part of the paged buffers, and of the probe data
@@ -128,6 +155,12 @@ public:
 
 	/// Compares this frame's lights with the last ones it was given and marks the probes around those that changed
 	void TrackLights(const SizedArray<ShadeLightCandidate>& lights);
+
+	/**
+	 * @brief Sets the boxes of the moving objects that the next updates trace, up to scMaxProxies. With `track`, the
+	 * probes around the boxes that appeared, went or moved since the last call are marked dirty.
+	 */
+	void SetDynamicProxies(const SizedArray<DynamicGIProxy>& proxies, bool track);
 
 	/// Moves the levels to `center`, then traces and blends this frame's probes
 	void Update(CommandBuffer& cmd, const FVec3& center, const Settings& settings);
@@ -210,10 +243,17 @@ private:
 	RawGpuBuffer mForwardData;
 
 	CompiledMapProbeMask mMask;
+	/// The mask level each level reads, the one built for its spacing, or -1 where the map has none
+	int32 mMaskLevels[scLevelCount] = { -1, -1, -1 };
 	bool mbMaskInUse = true;
 
 	SizedArray<TrackedLight> mTrackedLights;
 	bool mbHasTrackedLights = false;
+
+	/// This frame's boxes, and the last ones the dirty tracking compared against
+	SizedArray<DynamicGIProxy> mProxies;
+	SizedArray<DynamicGIProxy> mTrackedProxies;
+	bool mbHasTrackedProxies = false;
 
 	uint32 mUpdateCount = 0;
 	uint32 mLastJobCount = 0;

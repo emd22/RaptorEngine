@@ -10,8 +10,8 @@
 #include "Target.hpp"
 
 #include <Core/Log.hpp>
-#include <Renderer/Limits.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/Limits.hpp>
 #include <Texture/TextureManager.hpp>
 #include <algorithm>
 #include <cmath>
@@ -69,7 +69,7 @@ struct ProbeClipmapConsts
 	uint32 LightIndices[4] = {};
 	/// Light count, shading flags
 	uint32 Lights[4] = {};
-	/// Job count, frame
+	/// Job count, frame, flags, proxy count
 	uint32 Info[4] = {};
 	/// Hysteresis, fast hysteresis, change threshold, moment sharpness
 	float32 Blend[4] = {};
@@ -77,7 +77,10 @@ struct ProbeClipmapConsts
 	/// the dirty hysteresis.
 	float32 LevelRate[4] = {};
 	float32 SkyRadiance[4] = {};
+	ProbeClipmapProxyGpu Proxies[ProbeClipmap::scMaxProxies];
 };
+
+static_assert(sizeof(ProbeClipmapConsts) <= FrameAllocator::scMaxAllocationSize);
 
 /// Mirrors ProbeClipmapDebugConsts in Shaders/ProbeClipmapDebug.hlsl
 struct ProbeClipmapDebugConsts
@@ -106,7 +109,8 @@ constexpr uint32 scForwardFlagBakedSun = 0x01;
 
 static_assert(sizeof(ProbeClipmapForwardData) <= ProbeClipmap::scForwardDataFrameSize);
 static_assert(sizeof(ProbeClipmapLevelGpu) == 32);
-static_assert(sizeof(ProbeClipmapConsts) == 192 + 96 + 64 + 80 + 16 * 6);
+static_assert(sizeof(ProbeClipmapProxyGpu) == 64);
+static_assert(sizeof(ProbeClipmapConsts) == 192 + 96 + 64 + 80 + 16 * 6 + 64 * ProbeClipmap::scMaxProxies);
 static_assert(sizeof(ProbeClipmapDebugConsts) == 96 + 64 + 16 * 3);
 
 /// Mirrors SHADE_FLAG_BAKED_SUN in Shaders/SDFPageShade.hlsli
@@ -187,11 +191,12 @@ Image* CreateTileImage(uint32 tile_size, eImageFormat format)
 {
 	Image* image = gTextureManager->NewTexture();
 
-	image->Create(eImageType::Flat,
-				  UVec2(ProbeClipmap::scTileColumns * tile_size, static_cast<uint32>(ProbeClipmap::scGridZ) * tile_size), 1,
-				  format, VK_IMAGE_TILING_OPTIMAL,
-				  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-				  eImageAspectFlag::Color, eImageCreateFlags::IsTarget);
+	image->Create(
+		eImageType::Flat,
+		UVec2(ProbeClipmap::scTileColumns * tile_size, static_cast<uint32>(ProbeClipmap::scGridZ) * tile_size), 1,
+		format, VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		eImageAspectFlag::Color, eImageCreateFlags::IsTarget);
 
 	return image;
 }
@@ -249,7 +254,7 @@ void ProbeClipmap::Create()
 	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
 		Level& level = mLevels[level_index];
 
-		level.Spacing = scLevel0Spacing * static_cast<float32>(1U << level_index);
+		level.Spacing = scLevelSpacings[level_index];
 		level.Valid.InitSize(scProbesPerLevel, 0);
 		level.Dirty.InitSize(scProbesPerLevel, 0);
 		level.JobStamp.InitSize(scProbesPerLevel, 0);
@@ -261,6 +266,8 @@ void ProbeClipmap::Create()
 	}
 
 	mTrackedLights.InitCapacity(Limits::MaxActiveLights);
+	mProxies.InitCapacity(scMaxProxies);
+	mTrackedProxies.InitCapacity(scMaxProxies);
 
 	mJobs.Create(eGpuBufferType::Storage, static_cast<uint64>(scMaxJobsPerFrame) * sizeof(uint32) * FramesInFlight,
 				 VMA_MEMORY_USAGE_CPU_TO_GPU, eGpuBufferFlags::PersistentMapped);
@@ -342,7 +349,8 @@ void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
 						}));
 	gPSOBuild->AddBuffer(9, 0, eShaderType::Compute, &gGraphics->FogShadowPageBuffer, 0,
 						 gGraphics->FogShadowPageBufferSize);
-	gPSOBuild->AddBuffer(10, 0, eShaderType::Compute, &mJobs, 0, static_cast<uint64>(scMaxJobsPerFrame) * sizeof(uint32));
+	gPSOBuild->AddBuffer(10, 0, eShaderType::Compute, &mJobs, 0,
+						 static_cast<uint64>(scMaxJobsPerFrame) * sizeof(uint32));
 	gPSOBuild->AddBuffer(11, 0, eShaderType::Compute, &mRays, 0, VK_WHOLE_SIZE);
 
 	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
@@ -358,7 +366,8 @@ void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
 
 	gPSOBuild->BeginPipeline(ePipelineName::ProbeClipmapBlend);
 	gPSOBuild->SetShader(eShaderName::ProbeClipmapBlend, {});
-	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &mJobs, 0, static_cast<uint64>(scMaxJobsPerFrame) * sizeof(uint32));
+	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &mJobs, 0,
+						 static_cast<uint64>(scMaxJobsPerFrame) * sizeof(uint32));
 	gPSOBuild->AddBuffer(1, 0, eShaderType::Compute, &mRays, 0, VK_WHOLE_SIZE);
 
 	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
@@ -406,6 +415,8 @@ void ProbeClipmap::Reset()
 
 	mTrackedLights.Clear();
 	mbHasTrackedLights = false;
+	mTrackedProxies.Clear();
+	mbHasTrackedProxies = false;
 	mbClearProbeData = true;
 }
 
@@ -413,15 +424,35 @@ void ProbeClipmap::SetProbeMask(const CompiledMapProbeMask& mask)
 {
 	mMask = CompiledMapProbeMask {};
 
+	for (int32& mask_level : mMaskLevels) {
+		mask_level = -1;
+	}
+
 	if (mask.IsEmpty()) {
 		return;
 	}
 
-	for (uint32 level_index = 0; level_index < scLevelCount && level_index < mask.Levels.Size; level_index++) {
-		if (std::abs(mask.Levels[level_index].Spacing - mLevels[level_index].Spacing) > 1e-4f) {
-			LogWarning(LC_RENDER, "The map's GI probe mask was built for other probe spacings, ignoring it");
-			return;
+	// Each level uses the mask level built for its spacing, so a map compiled for other spacings keeps the levels
+	// that still match
+	uint32 matched_count = 0;
+
+	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
+		for (uint32 mask_index = 0; mask_index < mask.Levels.Size; mask_index++) {
+			if (std::abs(mask.Levels[mask_index].Spacing - mLevels[level_index].Spacing) <= 1e-4f) {
+				mMaskLevels[level_index] = static_cast<int32>(mask_index);
+				matched_count++;
+				break;
+			}
 		}
+	}
+
+	if (matched_count < scLevelCount) {
+		LogWarning(LC_RENDER, "The map's GI probe mask has {} of {} probe spacings, recompile the map", matched_count,
+				   scLevelCount);
+	}
+
+	if (matched_count == 0) {
+		return;
 	}
 
 	mMask.bOutsideDead = mask.bOutsideDead;
@@ -434,7 +465,9 @@ void ProbeClipmap::SetProbeMask(const CompiledMapProbeMask& mask)
 
 void ProbeClipmap::ClassifyLevel(uint32 level_index)
 {
-	if (!mbMaskInUse || mMask.IsEmpty()) {
+	const int32 mask_level = mMaskLevels[level_index];
+
+	if (!mbMaskInUse || mMask.IsEmpty() || mask_level < 0) {
 		return;
 	}
 
@@ -448,7 +481,7 @@ void ProbeClipmap::ClassifyLevel(uint32 level_index)
 		int32 probe[3];
 		SlotProbe(slot, level.Origin, probe);
 
-		if (!mMask.IsAlive(level_index, probe)) {
+		if (!mMask.IsAlive(static_cast<uint32>(mask_level), probe)) {
 			level.Valid[slot] = scDead;
 			level.InvalidCount--;
 		}
@@ -488,7 +521,8 @@ void ProbeClipmap::MarkDirty(const FVec3& center, float32 radius, float32 streng
 
 		for (uint32 axis = 0; axis < 3; axis++) {
 			first[axis] = std::max(FloorDiv(position[axis] - reach, level.Spacing), level.Origin[axis]);
-			last[axis] = std::min(FloorDiv(position[axis] + reach, level.Spacing) + 1, level.Origin[axis] + grid[axis] - 1);
+			last[axis] = std::min(FloorDiv(position[axis] + reach, level.Spacing) + 1,
+								  level.Origin[axis] + grid[axis] - 1);
 			is_empty = is_empty || (first[axis] > last[axis]);
 		}
 
@@ -506,7 +540,8 @@ void ProbeClipmap::MarkDirty(const FVec3& center, float32 radius, float32 streng
 						continue;
 					}
 
-					const uint32 slot = static_cast<uint32>(PositiveMod(x, scGridX) + PositiveMod(y, scGridY) * scGridX +
+					const uint32 slot = static_cast<uint32>(PositiveMod(x, scGridX) +
+															PositiveMod(y, scGridY) * scGridX +
 															PositiveMod(z, scGridZ) * scGridX * scGridY);
 
 					// Unfilled probes are traced from nothing anyway
@@ -651,6 +686,92 @@ void ProbeClipmap::TrackLights(const SizedArray<ShadeLightCandidate>& lights)
 	mbHasTrackedLights = true;
 }
 
+void ProbeClipmap::SetDynamicProxies(const SizedArray<DynamicGIProxy>& proxies, bool track)
+{
+	// A box that moved this much of its radius, or turned this far (radians), counts as fully changed
+	constexpr float32 scFullMove = 0.25f;
+	constexpr float32 scFullTurn = 0.35f;
+	/// Less than this is rounding
+	constexpr float32 scMinChange = 1e-3f;
+	/// Probes this many of its radii away still see enough of a box to be lit differently
+	constexpr float32 scReach = 2.0f;
+
+	mProxies.Clear();
+
+	for (const DynamicGIProxy& proxy : proxies) {
+		if (mProxies.Size >= mProxies.Capacity) {
+			break;
+		}
+
+		mProxies.Insert(proxy);
+	}
+
+	if (!track) {
+		mTrackedProxies.Clear();
+		mbHasTrackedProxies = false;
+		return;
+	}
+
+	const auto get_reach = [&](const DynamicGIProxy& proxy) { return proxy.HalfExtents.Length() * scReach; };
+
+	// The first boxes after a reset are seen by probes that have not been traced yet, so there is nothing to compare
+	if (mbHasTrackedProxies) {
+		for (const DynamicGIProxy& proxy : mProxies) {
+			const DynamicGIProxy* previous = nullptr;
+
+			for (const DynamicGIProxy& tracked : mTrackedProxies) {
+				if (tracked.ID == proxy.ID) {
+					previous = &tracked;
+					break;
+				}
+			}
+
+			if (previous == nullptr) {
+				MarkDirty(proxy.Center, get_reach(proxy), 1.0f);
+				continue;
+			}
+
+			const float32 radius = std::max(proxy.HalfExtents.Length(), 1e-3f);
+			const float32 move = proxy.Center.DistanceTo(previous->Center);
+
+			float32 change = move / (radius * scFullMove);
+
+			// Small angles are taken from the distance between the unit axes, as an arc cosine reads rounding as a turn
+			for (uint32 axis = 0; axis < 3; axis++) {
+				change += (proxy.Axes[axis] - previous->Axes[axis]).Length() / scFullTurn;
+			}
+
+			change += (proxy.HalfExtents - previous->HalfExtents).Length() / radius;
+
+			if (change > scMinChange) {
+				// The reach around where it is now, widened by how far it moved, holds where it was as well
+				MarkDirty(proxy.Center, get_reach(proxy) + move, std::min(change, 1.0f));
+			}
+		}
+
+		// Boxes that are gone
+		for (const DynamicGIProxy& tracked : mTrackedProxies) {
+			bool is_present = false;
+
+			for (const DynamicGIProxy& proxy : mProxies) {
+				is_present = is_present || (proxy.ID == tracked.ID);
+			}
+
+			if (!is_present) {
+				MarkDirty(tracked.Center, get_reach(tracked), 1.0f);
+			}
+		}
+	}
+
+	mTrackedProxies.Clear();
+
+	for (const DynamicGIProxy& proxy : mProxies) {
+		mTrackedProxies.Insert(proxy);
+	}
+
+	mbHasTrackedProxies = true;
+}
+
 uint32 ProbeClipmap::ScheduleDirtyJobs(uint32 level_index, uint32* jobs, uint32 job_count, uint32 limit)
 {
 	Level& level = mLevels[level_index];
@@ -703,7 +824,8 @@ void ProbeClipmap::PlaceLevel(uint32 level_index, const FVec3& center)
 			SlotProbe(slot, level.Origin, old_probe);
 			SlotProbe(slot, origin, new_probe);
 
-			const bool same = old_probe[0] == new_probe[0] && old_probe[1] == new_probe[1] && old_probe[2] == new_probe[2];
+			const bool same = old_probe[0] == new_probe[0] && old_probe[1] == new_probe[1] &&
+							  old_probe[2] == new_probe[2];
 
 			if (!same && level.Valid[slot] != 0) {
 				level.Valid[slot] = 0;
@@ -828,16 +950,16 @@ void ProbeClipmap::LogStats(uint32 frame, uint32 job_count)
 
 	const float64 blended = std::max(1.0, static_cast<float64>(stats[scStatBlended]));
 	const float64 updated = std::max(1.0, static_cast<float64>(stats[scStatBlended] + stats[scStatReset]));
-
-	LogInfo(LC_RENDER,
-			"GI clipmap: {} probes traced ({} new, {} dirty, {} / {} / {} still dirty), unfilled {} / {} / {}, masked "
-			"out {} / {} / {}, {:.0f} lux on average, mean change {:.4f}, {} black, {:.1f}% backface rays, {} switched off, {} moved",
-			job_count, stats[scStatReset], mLastDirtyJobCount, mLevels[0].DirtyCount, mLevels[1].DirtyCount,
-			mLevels[2].DirtyCount, mLevels[0].InvalidCount, mLevels[1].InvalidCount, mLevels[2].InvalidCount, dead[0],
-			dead[1], dead[2], static_cast<float64>(stats[scStatLight]) / scStatLightScale / updated * 3.14159265,
-			static_cast<float64>(stats[scStatChange]) / scStatChangeScale / blended, stats[scStatBlack],
-			100.0 * static_cast<float64>(stats[scStatBackfaces]) / (updated * scRayCount), stats[scStatInactive],
-			stats[scStatMoved]);
+	//
+	// 	LogInfo(LC_RENDER,
+	// 			"GI clipmap: {} probes traced ({} new, {} dirty, {} / {} / {} still dirty), unfilled {} / {} / {},
+	// masked " 			"out {} / {} / {}, {:.0f} lux on average, mean change {:.4f}, {} black, {:.1f}% backface rays, {}
+	// switched off, {} moved", 			job_count, stats[scStatReset], mLastDirtyJobCount, mLevels[0].DirtyCount,
+	// mLevels[1].DirtyCount, 			mLevels[2].DirtyCount, mLevels[0].InvalidCount, mLevels[1].InvalidCount,
+	// mLevels[2].InvalidCount, dead[0], 			dead[1], dead[2], static_cast<float64>(stats[scStatLight]) / scStatLightScale /
+	// updated * 3.14159265, 			static_cast<float64>(stats[scStatChange]) / scStatChangeScale / blended,
+	// stats[scStatBlack], 			100.0 * static_cast<float64>(stats[scStatBackfaces]) / (updated * scRayCount),
+	// stats[scStatInactive], 			stats[scStatMoved]);
 }
 
 void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Settings& settings)
@@ -929,6 +1051,32 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 
 	consts.Info[0] = job_count;
 	consts.Info[1] = gGraphics->GetElapsedFrameCount();
+	consts.Info[3] = mProxies.Size;
+
+	for (uint32 index = 0; index < mProxies.Size; index++) {
+		const DynamicGIProxy& proxy = mProxies[index];
+		ProbeClipmapProxyGpu& gpu = consts.Proxies[index];
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			const FVec3& direction = proxy.Axes[axis];
+
+			gpu.Axes[axis][0] = direction.X;
+			gpu.Axes[axis][1] = direction.Y;
+			gpu.Axes[axis][2] = direction.Z;
+			gpu.Axes[axis][3] = -direction.Dot(proxy.Center);
+		}
+
+		const auto to_byte = [](float32 value)
+		{ return static_cast<uint32>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f)); };
+
+		const uint32 albedo = to_byte(proxy.Albedo.X) | (to_byte(proxy.Albedo.Y) << 8) |
+							  (to_byte(proxy.Albedo.Z) << 16);
+
+		gpu.Extents[0] = proxy.HalfExtents.X;
+		gpu.Extents[1] = proxy.HalfExtents.Y;
+		gpu.Extents[2] = proxy.HalfExtents.Z;
+		memcpy(&gpu.Extents[3], &albedo, sizeof(albedo));
+	}
 
 	if (settings.bBounce) {
 		consts.Info[2] |= scFlagBounce;
@@ -958,10 +1106,12 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 
 	const float32 budget = static_cast<float32>(std::max(std::min(settings.Budget, scMaxJobsPerFrame), 1U));
 	const float32 nominal_period = static_cast<float32>(scProbesPerLevel) /
-								   (budget * static_cast<float32>(scLevelShares[0]) / static_cast<float32>(share_total));
+								   (budget * static_cast<float32>(scLevelShares[0]) /
+									static_cast<float32>(share_total));
 
 	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
-		const float32 quota = budget * static_cast<float32>(scLevelShares[level_index]) / static_cast<float32>(share_total);
+		const float32 quota = budget * static_cast<float32>(scLevelShares[level_index]) /
+							  static_cast<float32>(share_total);
 		const float32 period = std::max(static_cast<float32>(live_count[level_index]) / std::max(quota, 1.0f), 1.0f);
 
 		consts.LevelRate[level_index] = std::clamp(period / nominal_period, 1.0f / 16.0f, 8.0f);
@@ -1018,7 +1168,6 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 		ImageBarrier(cmd, mpIrradiance[level_index], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		ImageBarrier(cmd, mpMoments[level_index], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
-
 }
 
 void ProbeClipmap::WriteForwardData(uint32 frame, const Settings& settings, float32 fallback)
