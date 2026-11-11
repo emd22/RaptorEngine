@@ -329,6 +329,7 @@ void GraphicsBackend::RebuildRenderStages()
 	rd->SSAOPass.Rebuild(size);
 	rd->SSAODenoisePass.Rebuild(size);
 	rd->SSAOBlurPass.Rebuild(size);
+	rd->GIResolvePass.Rebuild(size);
 	rd->CompPass.Rebuild(size);
 
 	gTextRenderer->Resize();
@@ -989,6 +990,52 @@ static constexpr float32 scDefaultGTAOThinOccluderCompensation = 0.0f;
 static constexpr float32 scDefaultGTAOFinalValuePower = 2.2f;
 static constexpr float32 scDefaultGTAODenoiseBlurBeta = 1.2f;
 
+namespace {
+
+/// Mirrors ProbeClipmapResolveConsts in Shaders/ProbeClipmapResolve.hlsl
+struct ProbeClipmapResolveConsts
+{
+	float32 InvViewProjection[16] = {};
+	float32 EyePosition[4] = {};
+	/// Full resolution width and height
+	uint32 Info[4] = {};
+};
+
+static_assert(sizeof(ProbeClipmapResolveConsts) == 96);
+
+} // namespace
+
+void GraphicsBackend::RenderGIResolve(const BaseCamera& camera)
+{
+	FrameData* frame = GetFrame();
+
+	ProbeClipmapResolveConsts consts;
+
+	const FMat4 inverse = camera.GetCameraMatrix(eObjectLayer::WorldLayer).Inverse();
+	memcpy(consts.InvViewProjection, inverse.RawData, sizeof(FMat4));
+
+	const FVec3 eye = camera.GetPosition();
+	consts.EyePosition[0] = eye.X;
+	consts.EyePosition[1] = eye.Y;
+	consts.EyePosition[2] = eye.Z;
+	consts.EyePosition[3] = 1.0f;
+
+	const Target* depth = pRenderer->Prepass.GetTarget(eImageFormat::D32_Float);
+	consts.Info[0] = depth->Image.Info.Size.X;
+	consts.Info[1] = depth->Image.Info.Size.Y;
+
+	pRenderer->GIResolvePass.Begin(frame->CmdBuffer);
+
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, GIClipmap.GetForwardDataFrameOffset(GetFrameNumber()));
+	gPipelineCache->SetFrameData(FrameAlloc.Push(consts));
+	gPipelineCache->Bind(ePipelineName::ProbeClipmapResolve, frame->CmdBuffer);
+
+	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
+
+	pRenderer->GIResolvePass.End();
+}
+
 void GraphicsBackend::RenderEarlyFrameEffects(PerspectiveCamera& camera)
 {
 	FrameData* frame = GetFrame();
@@ -1074,7 +1121,8 @@ eFogMode GraphicsBackend::GetFogMode() const
 	return eFogMode::Froxel;
 }
 
-void GraphicsBackend::SelectShadeLights(const FVec3& center, float32 reach, uint32 out_slots[4], uint32& out_count) const
+void GraphicsBackend::SelectShadeLights(const FVec3& center, float32 reach,
+										uint32 out_slots[SDFPageScene::scShadeMaxLights], uint32& out_count) const
 {
 	constexpr uint32 scMax = SDFPageScene::scShadeMaxLights;
 
@@ -1303,7 +1351,7 @@ void GraphicsBackend::RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset)
 	gPipelineCache->AddBufferOffset(0, GetLightGridFrameOffset());
 	gPipelineCache->AddBufferOffset(0, GetLightIndexListFrameOffset());
 	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, GIClipmap.GetStateFrameOffset(GetFrameNumber()));
+	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, GIClipmap.GetForwardDataFrameOffset(GetFrameNumber()));
 
 	gPipelineCache->SetFrameData(consts_offset);

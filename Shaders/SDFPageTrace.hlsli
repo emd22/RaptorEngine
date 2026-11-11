@@ -208,4 +208,64 @@ SDFPageHit SDFPageTrace(float3 origin, float3 direction, float max_distance, flo
 	return hit;
 }
 
+/// Steps a hit at most this many times on the finest level that holds it
+#define SDF_PAGE_REFINE_STEPS 6
+/// Hits on this level or finer are close enough to their surface already
+#define SDF_PAGE_REFINE_MIN_LEVEL 2
+
+/**
+ * Moves a hit made on a coarse level up to the surface on the finest level there. A coarse hit stops up to most of a
+ * coarse texel short of the surface, where the nearest triangle of its block (half a metre or more across) is often
+ * a wall beside it or the back of the wall it hit, so its normal and facing were wrong. A ray that only grazed a
+ * surface finds nothing within two coarse texels and keeps its coarse hit.
+ */
+SDFPageHit SDFPageRefineHit(SDFPageHit hit, float3 origin, float3 direction, float max_distance)
+{
+	if (or(!hit.bHit, hit.uiLevel < SDF_PAGE_REFINE_MIN_LEVEL)) {
+		return hit;
+	}
+
+	const float end = min(hit.fDistance + SDF_PAGE_SCENE.Levels[hit.uiLevel].vParams.w * 2.0, max_distance);
+	float t = hit.fDistance;
+
+	[loop]
+	for (uint step = 0; step < SDF_PAGE_REFINE_STEPS; step++) {
+		const float3 position = origin + direction * t;
+
+		uint level;
+		int3 coord;
+		uint atlas;
+
+		if (!SDFPageFind(position, 0, level, coord, atlas)) {
+			break;
+		}
+
+		const SDFPageLevel sdf_page_level = SDF_PAGE_SCENE.Levels[level];
+
+		// Nothing is within an empty page's margin of any point in it
+		const bool is_empty = atlas == SDF_PAGE_EMPTY;
+		const float distance = select(is_empty, sdf_page_level.vParams.z,
+									  SDFPageSampleDistance(level, coord, select(is_empty, 0u, atlas), position));
+
+		if (and(!is_empty, distance < sdf_page_level.vParams.w * SDF_PAGE_HIT_TEXELS)) {
+			if (level < hit.uiLevel) {
+				hit.fDistance = t;
+				hit.uiLevel = level;
+				hit.uiAtlas = atlas;
+				hit.vCoord = coord;
+			}
+
+			break;
+		}
+
+		t += distance;
+
+		if (!(t < end)) {
+			break;
+		}
+	}
+
+	return hit;
+}
+
 #endif

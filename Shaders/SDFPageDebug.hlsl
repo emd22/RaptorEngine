@@ -16,7 +16,7 @@ struct SDFPageDebugConsts
 	float4 vParams;
 	BakedSunShadowParams BakedSun;
 	/// Light buffer slots shaded at each hit
-	uint4 vLightIndices;
+	uint4 vLightIndices[SHADE_LIGHT_VECTORS];
 	/// Light count, flags (SHADE_FLAG_*), probe stride
 	uint4 vLights;
 	/// Radiance of the rays that miss
@@ -67,6 +67,9 @@ F_FrameData(SDFPageDebugConsts, Consts, 1);
 #define VIEW_PROBE_RAYS 9
 /// The probe rays of VIEW_PROBE_RAYS, with the light leaving each hit (albedo, sun, local lights) or the sky
 #define VIEW_PROBE_SHADE 10
+/// What the probes find where the camera's rays stop: the albedo of the nearest triangle, red where that triangle faces
+/// away from the ray (the probes take it for a back face) and magenta where a black blocker is nearest
+#define VIEW_HIT_TRIANGLE 11
 #define PROBE_SIZE 8
 
 #define PRIMARY_MAX_DISTANCE 500.0
@@ -229,6 +232,16 @@ float3 ShadePixel(uint2 pixel, uint2 group, uint2 local)
 			}
 			else if (view == VIEW_NORMALS) {
 				colour = SDFPageNormal(position, texel) * 0.5 + 0.5;
+			}
+			else if (view == VIEW_HIT_TRIANGLE) {
+				const SDFPageTriangle page_triangle = SDFPageNearestTriangle(hit, position);
+				const float3 face = cross(page_triangle.vB.xyz - page_triangle.vA.xyz, page_triangle.vC.xyz - page_triangle.vA.xyz);
+				const float3 albedo = SDFPageTriangleAlbedo(page_triangle);
+				const bool is_backface = dot(face, view_direction) > 0.0;
+				const bool is_black = all(albedo < 1e-3);
+
+				colour = select(is_black, float3(1.0, 0.0, 1.0), albedo);
+				colour = select(is_backface, float3(1.0, 0.0, 0.0), colour);
 			}
 		}
 

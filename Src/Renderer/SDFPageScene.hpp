@@ -123,6 +123,7 @@ public:
 		GiSteps,
 		ProbeRays,
 		ProbeShade,
+		HitTriangle,
 		Count,
 	};
 
@@ -146,7 +147,7 @@ public:
 					 float32 ray_length, uint32 probe_stride);
 
 	/// Mirrors SHADE_MAX_LIGHTS in Shaders/SDFPageShade.hlsli
-	static constexpr uint32 scShadeMaxLights = 4;
+	static constexpr uint32 scShadeMaxLights = 16;
 
 	bool IsActive() const { return mbActive; }
 

@@ -256,14 +256,16 @@ PERMEND();
 // The runtime GI probes, see ProbeClipmap
 #include "ProbeClipmapForward.hlsli"
 
-F_Texture2D(tIrradiance0, 21, 0)
-F_Texture2D(tIrradiance1, 22, 0)
-F_Texture2D(tIrradiance2, 23, 0)
-F_Texture2D(tMoments0, 24, 0)
-F_Texture2D(tMoments1, 25, 0)
-F_Texture2D(tMoments2, 26, 0)
-F_StructBuffer(bState, uint, 27, 0);
-F_StructBuffer(bProbeData, float4, 28, 0);
+F_Texture2D(tIrradiance, 21, 0)
+F_Texture2D(tMoments, 24, 0)
+F_StructBuffer(bProbes, uint4, 28, 0);
+
+// The probes gathered at half resolution for the main view, see ProbeClipmapResolve.hlsl
+F_Texture2D(tGIDiffuse, 22, 0)
+Texture2D<uint> tGISpecularTexture : register(t23, space0);
+SamplerState tGISpecular : register(s23, space0);
+F_Texture2D(tGINormal, 25, 0)
+#include "ProbeClipmapResolve.hlsli"
 F_StructBuffer(bClipmapForward, ClipmapForwardData, 29, 0);
 F_ShadowTexture2D(tFogShadowAtlas, 30, 0);
 F_StructBuffer(bFogShadowPages, FogShadowPage, 31, 0);
@@ -747,9 +749,66 @@ PERMEND();
 	// A rough surface's lobe is centred nearer the normal than the reflection
 	const float3 R = GetSpecularDominantDir(N, reflect(-V, N), specular_alpha);
 
+	bool needs_gather = true;
+
+PERMNOT(PROBE_CAPTURE);
+	// The half resolution gather, read back from the texels around the pixel that are the same surface: about as far
+	// from the eye, facing the same way. Where none are (silhouettes, surfaces the prepass doesn't hold, other views),
+	// the pixel gathers the probes itself below.
 	{
-		const ClipmapGatherResult clipmap = ClipmapGather(input.vPositionWS, geometric_normal, V, diffuse_normal, R,
-														  ClipmapScreenDither(input.vPosition.xy));
+		uint gi_width;
+		uint gi_height;
+		F_TextureName(tGIDiffuse).GetDimensions(gi_width, gi_height);
+
+		const uint2 pixel = uint2(input.vPosition.xy);
+		const int2 base = int2(pixel >> 1);
+		const float2 frac_xy = select((pixel & 1u) != 0u, float2(0.5, 0.5), float2(0.0, 0.0));
+		const float pixel_distance = length(ViewConst.vEyePosition.xyz - input.vPositionWS);
+		// Half resolution rounds odd sizes down
+		const bool is_main_view = all(uint2(ViewConst.vTargetSize) - uint2(gi_width, gi_height) * 2u <= 1u);
+
+		float3 resolved_diffuse = float3(0.0, 0.0, 0.0);
+		float3 resolved_specular = float3(0.0, 0.0, 0.0);
+		float resolved_weight = 0.0;
+		bool resolved_has_probes = false;
+
+		[unroll]
+		for (uint tap = 0; tap < 4; tap++) {
+			const int2 offset = int2(tap & 1, tap >> 1);
+			const int3 coord = int3(min(base + offset, int2(gi_width, gi_height) - 1), 0);
+
+			const float4 diffuse = F_SampleLoad(tGIDiffuse, coord);
+			const uint specular = F_SampleLoad(tGISpecular, coord);
+			const float3 normal = GIResolveDecodeNormal(F_SampleLoad(tGINormal, coord).xy);
+
+			const float2 axis = lerp(1.0 - frac_xy, frac_xy, float2(offset));
+			const float relative_depth = abs(diffuse.a - pixel_distance) / max(pixel_distance, 1e-3);
+			const float depth_weight = saturate(1.0 - relative_depth * 40.0);
+			const float normal_weight = pow(saturate(dot(normal, N)), 8.0);
+			const float weight = axis.x * axis.y * depth_weight * depth_weight * normal_weight *
+								 select(diffuse.a > 0.0, 1.0, 0.0);
+
+			resolved_diffuse += diffuse.rgb * weight;
+			resolved_specular += GIResolveUnpackSpecular(specular) * weight;
+			resolved_weight += weight;
+			resolved_has_probes = or(resolved_has_probes, and(weight > 0.0, (specular & GI_RESOLVE_HAS_PROBES) != 0u));
+		}
+
+		// The pixel's own texel (or the two or four it lies between) has to be a fair part of the weight, or the
+		// texels that do match are too far off to stand for it
+		const bool is_resolved = and(is_main_view, resolved_weight > 0.15);
+		const float inv_weight = 1.0 / max(resolved_weight, 1e-6);
+
+		probe_irradiance = resolved_diffuse * inv_weight;
+		probe_radiance = resolved_specular * inv_weight;
+		has_probes = resolved_has_probes;
+		needs_gather = !is_resolved;
+	}
+PERMEND();
+
+	// Pixels the half resolution gather can't stand for are a small share of the screen, so this branch is coherent
+	if (needs_gather) {
+		const ClipmapGatherResult clipmap = ClipmapGather(input.vPositionWS, geometric_normal, V, diffuse_normal, R);
 
 		const bool in_clipmap = clipmap.uiLevel < CLIPMAP_LEVELS;
 		const float3 fallback = bClipmapForward[0].vFallback.rgb;

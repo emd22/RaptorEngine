@@ -5,8 +5,6 @@
 #include "BakedSunShadow.hlsli"
 
 
-/// Mirrors scShadeMaxLights in Src/Renderer/SDFPageScene.hpp
-#define SHADE_MAX_LIGHTS 4
 #define SHADE_FLAG_BAKED_SUN 0x01
 #define SHADE_SHADOW_OFFSET 0.05
 
@@ -49,10 +47,12 @@ float SDFPageLocalShadow(Light light, float3 position_ws)
 
 /**
  * Radiance a lambertian hit sends back along the ray, from the light buffer slots in `light_indices` (the first
- * `light_count` of them) and, with SHADE_FLAG_BAKED_SUN in `flags`, the baked sun visibility
+ * `light_count` of them) and, with SHADE_FLAG_BAKED_SUN in `flags`, the baked sun visibility. The slots are the same
+ * for every hit, so the set of lights a probe sees doesn't depend on where it was traced from. Each hit skips the
+ * shadow lookups of the lights that don't reach it.
  */
 float3 SDFPageShadeHit(float3 position, float3 normal, float3 albedo, float2 rotation, BakedSunShadowParams baked_sun,
-					   uint4 light_indices, uint light_count, uint flags)
+					   uint4 light_indices[SHADE_LIGHT_VECTORS], uint light_count, uint flags)
 {
 	const float3 shadow_position = position + normal * SHADE_SHADOW_OFFSET;
 	const bool has_baked_sun = HAS_FLAG(flags, SHADE_FLAG_BAKED_SUN);
@@ -62,7 +62,7 @@ float3 SDFPageShadeHit(float3 position, float3 normal, float3 albedo, float2 rot
 
 	[loop]
 	for (uint index = 0; index < count; index++) {
-		const Light light = Lights[light_indices[index]];
+		const Light light = Lights[light_indices[index >> 2][index & 3]];
 
 		const bool is_directional = light.uiLightType == FX_LIGHT_TYPE_DIRECTIONAL;
 		const bool is_spot = light.uiLightType == FX_LIGHT_TYPE_SPOT;
@@ -75,7 +75,11 @@ float3 SDFPageShadeHit(float3 position, float3 normal, float3 albedo, float2 rot
 		attenuation *= select(is_spot, AttenuationSpot(L, light), 1.0);
 		attenuation *= saturate(dot(normal, L));
 
-		// The light is the same for the whole wave, so this does not diverge
+		// Most local lights are out of range of most hits, and the shadow lookups are what costs
+		if (!(attenuation > 0.0)) {
+			continue;
+		}
+
 		float visibility = 1.0;
 
 		if (is_directional) {

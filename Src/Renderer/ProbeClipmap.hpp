@@ -34,6 +34,8 @@ struct ProbeClipmapLevelGpu
 	int32 Origin[4] = {};
 	/// Probe spacing, its reciprocal, ray length, cone slope
 	float32 Params[4] = {};
+	/// The point the window is centred on, in probes
+	float32 Center[4] = {};
 };
 
 /// Laid out to match ClipmapProxy in Shaders/ProbeClipmapConsts.hlsli
@@ -70,9 +72,10 @@ public:
 	static constexpr uint32 scProbesPerLevel = scGridX * scGridY * scGridZ;
 	static constexpr uint32 scRayCount = 64;
 	static constexpr uint32 scIrradianceSize = 8;
-	static constexpr uint32 scMomentsSize0 = 16;
 	static constexpr uint32 scMomentsSize = 16;
+	/// All levels share one atlas per kind, the levels stacked down it
 	static constexpr uint32 scTileColumns = scGridX * scGridY;
+	static constexpr uint32 scTileRows = scGridZ * scLevelCount;
 
 	/// How many of its next updates a fully dirty probe is traced first and blended faster for. Mirrors
 	/// CLIPMAP_DIRTY_UPDATES in Shaders/ProbeClipmapConsts.hlsli, and has to fit the job's four dirty bits.
@@ -85,15 +88,9 @@ public:
 	static constexpr uint32 scMaxProxies = 32;
 	static constexpr uint32 scMaxJobsPerFrame = 8192;
 
-	/// Sizes of one frame's part of the paged buffers, and of the probe data
-	static constexpr uint64 scStateFrameSize = static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(uint32);
-	/// The probe data is per grid point, wrapping twice as wide as the window in X and Z. Mirrors
-	/// CLIPMAP_PROBE_DATA_* in Shaders/ProbeClipmapCommon.hlsli
-	static constexpr uint32 scProbeDataX = scGridX * 2;
-	static constexpr uint32 scProbeDataY = scGridY;
-	static constexpr uint32 scProbeDataZ = scGridZ * 2;
-	static constexpr uint64 scProbeDataSize = static_cast<uint64>(scLevelCount) * scProbeDataX * scProbeDataY *
-											  scProbeDataZ * sizeof(float32) * 4;
+	/// One uint4 record per slot, written by the blend: the probe it holds, whether it is filled and switched on, its
+	/// offset, age and back face share. See bProbes in Shaders/ProbeClipmapCommon.hlsli.
+	static constexpr uint64 scProbesSize = static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(uint32) * 4;
 	static constexpr uint64 scForwardDataFrameSize = 256;
 
 	enum class eDebugView : uint32
@@ -105,6 +102,9 @@ public:
 		Spheres1,
 		Spheres2,
 		Visibility,
+		Backfaces,
+		Backfaces1,
+		Backfaces2,
 		Count,
 	};
 
@@ -170,13 +170,11 @@ public:
 
 	bool IsReady() const { return mbImagesInitialized; }
 
-	Image* GetIrradianceImage(uint32 level) { return mpIrradiance[level]; }
-	Image* GetMomentsImage(uint32 level) { return mpMoments[level]; }
-	RawGpuBuffer* GetStateBuffer() { return &mState; }
-	RawGpuBuffer* GetProbeDataBuffer() { return &mProbeData; }
+	Image* GetIrradianceImage() { return mpIrradiance; }
+	Image* GetMomentsImage() { return mpMoments; }
+	RawGpuBuffer* GetProbeBuffer() { return &mProbes; }
 	RawGpuBuffer* GetForwardDataBuffer() { return &mForwardData; }
 
-	uint32 GetStateFrameOffset(uint32 frame) const { return static_cast<uint32>(frame * scStateFrameSize); }
 	uint32 GetForwardDataFrameOffset(uint32 frame) const { return static_cast<uint32>(frame * scForwardDataFrameSize); }
 
 private:
@@ -186,7 +184,8 @@ private:
 		int32 Origin[3] = {};
 		bool bPlaced = false;
 
-		/// 0 unfilled, 1 filled, scPending traced for the first time this frame, scDead never traced
+		/// 0 unfilled, 1 filled, scPending traced for the first time this frame, scDead never traced. The GPU keeps its
+		/// own copy in the probe records, which is what the passes reading the probes go by.
 		SizedArray<uint8> Valid;
 		uint32 Cursor = 0;
 		uint32 InvalidCount = 0;
@@ -226,18 +225,17 @@ private:
 private:
 	Level mLevels[scLevelCount];
 
-	Image* mpIrradiance[scLevelCount] = {};
-	Image* mpMoments[scLevelCount] = {};
+	Image* mpIrradiance = nullptr;
+	Image* mpMoments = nullptr;
 	bool mbImagesInitialized = false;
 
 	RawGpuBuffer mJobs;
 	RawGpuBuffer mRays;
-	RawGpuBuffer mState;
-	RawGpuBuffer mStats;
-	/// Per grid point: offset off it and whether the probe is switched on, written by the blend
-	RawGpuBuffer mProbeData;
-	/// Set by Reset, so the next update forgets the previous map's offsets
-	bool mbClearProbeData = true;
+	/// Per slot: the probe it holds and its state, written by the blend
+	RawGpuBuffer mProbes;
+	/// Set by Reset, so the next update forgets the previous map's probes
+	bool mbClearProbes = true;
+	FVec3 mCenter = FVec3::sZero;
 	/// What the forward pass needs to read the probes, see ProbeClipmapForwardData
 	RawGpuBuffer mForwardData;
 

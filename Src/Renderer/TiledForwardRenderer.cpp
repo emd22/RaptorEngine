@@ -50,6 +50,7 @@ void TiledForwardRenderer::Create(const UVec2& extent)
 	CreateDepthNormalPSO();
 	CreateSSAOPSO();
 	CreateSSAOBlurPSO();
+	CreateGIResolvePSO();
 	CreateForwardPSO();
 	CreateCompositionPSO();
 	CreateBitmapTextPSO();
@@ -324,17 +325,27 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 		eSamplerAddressMode::ClampToEdge,
 	});
 
-	for (uint32 level = 0; level < ProbeClipmap::scLevelCount; level++) {
-		ds_entries.Insert(DescriptorEntry::AsImage(21 + level, eShaderType::Pixel, clipmap.GetIrradianceImage(level),
-												   clipmap_sampler));
-		ds_entries.Insert(DescriptorEntry::AsImage(24 + level, eShaderType::Pixel, clipmap.GetMomentsImage(level),
-												   clipmap_sampler));
-	}
+	ds_entries.Insert(DescriptorEntry::AsImage(21, eShaderType::Pixel, clipmap.GetIrradianceImage(), clipmap_sampler));
 
-	ds_entries.Insert(DescriptorEntry::AsBuffer(27, eShaderType::Pixel, clipmap.GetStateBuffer(), 0,
-												ProbeClipmap::scStateFrameSize));
-	ds_entries.Insert(DescriptorEntry::AsBuffer(28, eShaderType::Pixel, clipmap.GetProbeDataBuffer(), 0,
-												ProbeClipmap::scProbeDataSize));
+	// The half resolution gather, read texel by texel
+	Sampler* resolve_sampler = gSamplerCache->Request({
+		eSamplerFilter::Nearest,
+		eSamplerFilter::Nearest,
+		eSamplerFilter::Nearest,
+		eSamplerAddressMode::ClampToEdge,
+	});
+
+	ds_entries.Insert(DescriptorEntry::AsImage(22, eShaderType::Pixel,
+											   &GIResolvePass.GetTarget(eImageFormat::RGBA16_Float)->Image,
+											   resolve_sampler));
+	ds_entries.Insert(DescriptorEntry::AsImage(23, eShaderType::Pixel,
+											   &GIResolvePass.GetTarget(eImageFormat::R32_UInt)->Image, resolve_sampler));
+	ds_entries.Insert(DescriptorEntry::AsImage(25, eShaderType::Pixel,
+											   &GIResolvePass.GetTarget(eImageFormat::RG16_Float)->Image,
+											   resolve_sampler));
+	ds_entries.Insert(DescriptorEntry::AsImage(24, eShaderType::Pixel, clipmap.GetMomentsImage(), clipmap_sampler));
+	ds_entries.Insert(DescriptorEntry::AsBuffer(28, eShaderType::Pixel, clipmap.GetProbeBuffer(), 0,
+												ProbeClipmap::scProbesSize));
 	ds_entries.Insert(DescriptorEntry::AsBuffer(29, eShaderType::Pixel, clipmap.GetForwardDataBuffer(), 0,
 												ProbeClipmap::scForwardDataFrameSize));
 	ds_entries.Insert(DescriptorEntry::AsImage(30, eShaderType::Pixel, gGraphics->pFogShadowAtlas, GetFogShadowSampler()));
@@ -416,6 +427,52 @@ void TiledForwardRenderer::CreateSSAOBlurPSO()
 	BuildPipeline(ePipelineName::SSAODenoise, SSAODenoisePass, SSAOPass, {});
 	BuildPipeline(ePipelineName::SSAOBlur, SSAOBlurPass, SSAODenoisePass,
 				  { ShaderMacro { .pcName = "FINAL_APPLY", .pcValue = "1" } });
+}
+
+void TiledForwardRenderer::CreateGIResolvePSO()
+{
+	GIResolvePass.Create("GIResolve", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
+
+	constexpr VkImageUsageFlags scUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+	GIResolvePass.AddTarget(eImageFormat::RGBA16_Float, scUsage, eImageAspectFlag::Color);
+	GIResolvePass.AddTarget(eImageFormat::R32_UInt, scUsage, eImageAspectFlag::Color);
+	GIResolvePass.AddTarget(eImageFormat::RG16_Float, scUsage, eImageAspectFlag::Color);
+	GIResolvePass.BuildRenderStage();
+
+	ProbeClipmap& clipmap = gGraphics->GIClipmap;
+
+	Sampler* point_sampler = gSamplerCache->Request(SamplerProps {
+		eSamplerFilter::Nearest,
+		eSamplerFilter::Nearest,
+		eSamplerFilter::Nearest,
+	});
+
+	Sampler* clipmap_sampler = gSamplerCache->Request({
+		eSamplerFilter::Linear,
+		eSamplerFilter::Linear,
+		eSamplerFilter::Nearest,
+		eSamplerAddressMode::ClampToEdge,
+	});
+
+	gPSOBuild->BeginPipeline(ePipelineName::ProbeClipmapResolve);
+
+	gPSOBuild->UseRenderStage(GIResolvePass);
+	gPSOBuild->SetShader(eShaderName::ProbeClipmapResolve, {});
+	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
+	gPSOBuild->SetCullMode(eCullMode::None);
+
+	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::D32_Float), point_sampler);
+	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::RGBA16_Float),
+								  point_sampler);
+	gPSOBuild->AddImage(2, 0, eShaderType::Pixel, clipmap.GetIrradianceImage(), clipmap_sampler);
+	gPSOBuild->AddImage(3, 0, eShaderType::Pixel, clipmap.GetMomentsImage(), clipmap_sampler);
+	gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, clipmap.GetProbeBuffer(), 0, ProbeClipmap::scProbesSize);
+	gPSOBuild->AddBuffer(5, 0, eShaderType::Pixel, clipmap.GetForwardDataBuffer(), 0,
+						 ProbeClipmap::scForwardDataFrameSize);
+	gPSOBuild->AddFrameData(1);
+
+	gPSOBuild->EndPipeline();
 }
 
 void TiledForwardRenderer::CreateDebugLayerPSO()
@@ -744,13 +801,15 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 	// The runtime GI probes, bound in the persistent DS
 	ProbeClipmap& clipmap = gGraphics->GIClipmap;
 
-	for (uint32 level = 0; level < ProbeClipmap::scLevelCount; level++) {
-		gPSOBuild->AddImage(21 + level, 0, eShaderType::Pixel, clipmap.GetIrradianceImage(level), gSamplerCache->Request({}));
-		gPSOBuild->AddImage(24 + level, 0, eShaderType::Pixel, clipmap.GetMomentsImage(level), gSamplerCache->Request({}));
-	}
-
-	gPSOBuild->AddBuffer(27, 0, eShaderType::Pixel, clipmap.GetStateBuffer(), 0, ProbeClipmap::scStateFrameSize);
-	gPSOBuild->AddBuffer(28, 0, eShaderType::Pixel, clipmap.GetProbeDataBuffer(), 0, ProbeClipmap::scProbeDataSize);
+	gPSOBuild->AddImage(21, 0, eShaderType::Pixel, clipmap.GetIrradianceImage(), gSamplerCache->Request({}));
+	gPSOBuild->AddImageFromTarget(22, 0, eShaderType::Pixel, GIResolvePass.GetTarget(eImageFormat::RGBA16_Float),
+								  gSamplerCache->Request({}));
+	gPSOBuild->AddImageFromTarget(23, 0, eShaderType::Pixel, GIResolvePass.GetTarget(eImageFormat::R32_UInt),
+								  gSamplerCache->Request({}));
+	gPSOBuild->AddImageFromTarget(25, 0, eShaderType::Pixel, GIResolvePass.GetTarget(eImageFormat::RG16_Float),
+								  gSamplerCache->Request({}));
+	gPSOBuild->AddImage(24, 0, eShaderType::Pixel, clipmap.GetMomentsImage(), gSamplerCache->Request({}));
+	gPSOBuild->AddBuffer(28, 0, eShaderType::Pixel, clipmap.GetProbeBuffer(), 0, ProbeClipmap::scProbesSize);
 	gPSOBuild->AddBuffer(29, 0, eShaderType::Pixel, clipmap.GetForwardDataBuffer(), 0,
 						 ProbeClipmap::scForwardDataFrameSize);
 	gPSOBuild->AddImage(30, 0, eShaderType::Pixel, gGraphics->pFogShadowAtlas, GetFogShadowSampler());
@@ -1035,12 +1094,8 @@ void TiledForwardRenderer::CreateParticlePSO()
 	// Lit particles take the light around them from the runtime GI probes
 	ProbeClipmap& clipmap = gGraphics->GIClipmap;
 
-	for (uint32 level = 0; level < ProbeClipmap::scLevelCount; level++) {
-		gPSOBuild->AddImage(3 + level, 0, eShaderType::Vertex, clipmap.GetIrradianceImage(level),
-							gSamplerCache->Request(SamplerProps {}));
-	}
-
-	gPSOBuild->AddBuffer(6, 0, eShaderType::Vertex, clipmap.GetStateBuffer(), 0, ProbeClipmap::scStateFrameSize);
+	gPSOBuild->AddImage(3, 0, eShaderType::Vertex, clipmap.GetIrradianceImage(), gSamplerCache->Request(SamplerProps {}));
+	gPSOBuild->AddBuffer(6, 0, eShaderType::Vertex, clipmap.GetProbeBuffer(), 0, ProbeClipmap::scProbesSize);
 	gPSOBuild->AddBuffer(7, 0, eShaderType::Vertex, clipmap.GetForwardDataBuffer(), 0,
 						 ProbeClipmap::scForwardDataFrameSize);
 
@@ -1133,9 +1188,7 @@ void TiledForwardRenderer::CreateFogPSO()
 									  }));
 
 		// The ambient light of the fog is the mean of the runtime GI probes around it
-		for (uint32 level = 0; level < ProbeClipmap::scLevelCount; level++) {
-			gPSOBuild->AddImage(5 + level, 0, eShaderType::Compute, clipmap.GetIrradianceImage(level), volume_sampler);
-		}
+		gPSOBuild->AddImage(5, 0, eShaderType::Compute, clipmap.GetIrradianceImage(), volume_sampler);
 
 		gPSOBuild->AddStorageImage(8, 0, eShaderType::Compute, &FroxelLighting);
 		gPSOBuild->AddImage(9, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas, GetFogShadowSampler());
@@ -1143,7 +1196,7 @@ void TiledForwardRenderer::CreateFogPSO()
 							 gGraphics->FogShadowPageBufferSize);
 		gPSOBuild->AddImage(11, 0, eShaderType::Compute, &FroxelHistory, volume_sampler);
 		gPSOBuild->AddStorageImage(12, 0, eShaderType::Compute, &FroxelSurface);
-		gPSOBuild->AddBuffer(13, 0, eShaderType::Compute, clipmap.GetStateBuffer(), 0, ProbeClipmap::scStateFrameSize);
+		gPSOBuild->AddBuffer(13, 0, eShaderType::Compute, clipmap.GetProbeBuffer(), 0, ProbeClipmap::scProbesSize);
 		gPSOBuild->AddBuffer(14, 0, eShaderType::Compute, clipmap.GetForwardDataBuffer(), 0,
 							 ProbeClipmap::scForwardDataFrameSize);
 

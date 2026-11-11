@@ -151,6 +151,8 @@ private:
 	void CreateDepthNormalPSO();
 	void CreateSSAOPSO();
 	void CreateSSAOBlurPSO();
+	/// The half resolution gather of the GI probes for the main view, which the forward pass reads back
+	void CreateGIResolvePSO();
 	void CreateFogPSO();
 	void CreateDebugLayerPSO();
 	void CreateDebugSolidPSO();
@@ -225,6 +227,9 @@ public:
 	RenderStage SSAOPass;
 	RenderStage SSAODenoisePass;
 	RenderStage SSAOBlurPass;
+
+	/// The GI probes gathered at half resolution: diffuse + eye distance, packed specular, normal
+	RenderStage GIResolvePass;
 
 	/* Volumetric Lighting */
 	RenderStage FogApplyPass;

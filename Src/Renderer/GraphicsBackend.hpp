@@ -137,6 +137,9 @@ public:
 
 	void RenderEarlyFrameEffects(PerspectiveCamera& camera);
 
+	/// Gathers the GI probes at half resolution from the prepass, for the forward pass to read back
+	void RenderGIResolve(const BaseCamera& camera);
+
 	void RenderFog(PerspectiveCamera& camera);
 	void RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset);
 
@@ -203,9 +206,10 @@ public:
 
 	/**
 	 * @brief The light buffer slots the GI shades its hits with: the sun, then the nearest local lights that reach
-	 * within `reach` of `center`, up to SDFPageScene::scShadeMaxLights
+	 * within `reach` of `center`, up to SDFPageScene::scShadeMaxLights. Each hit skips the ones out of its range.
 	 */
-	void SelectShadeLights(const FVec3& center, float32 reach, uint32 out_slots[4], uint32& out_count) const;
+	void SelectShadeLights(const FVec3& center, float32 reach, uint32 out_slots[SDFPageScene::scShadeMaxLights],
+						   uint32& out_count) const;
 
 	bool HasDebugView() const { return bOnlyRenderProbes || bRenderProbeVisibility || (ReflectionDebugView != 0); }
 

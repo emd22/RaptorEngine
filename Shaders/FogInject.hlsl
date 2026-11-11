@@ -28,10 +28,8 @@ F_Texture3D(tFroxelHistory, 11, 0);
 F_FrameData(FogConsts, Consts, 1);
 
 // The runtime GI probes, see ProbeClipmap
-F_Texture2D(tIrradiance0, 5, 0);
-F_Texture2D(tIrradiance1, 6, 0);
-F_Texture2D(tIrradiance2, 7, 0);
-F_StructBuffer(bState, uint, 13, 0);
+F_Texture2D(tIrradiance, 5, 0);
+F_StructBuffer(bProbes, uint4, 13, 0);
 F_StructBuffer(bClipmapForward, ClipmapForwardData, 14, 0);
 
 #include "ProbeClipmapMean.hlsli"

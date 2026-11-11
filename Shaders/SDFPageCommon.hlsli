@@ -13,6 +13,10 @@
 #define SDF_PAGE_ATLAS_SHIFT_X 6
 #define SDF_PAGE_ATLAS_SHIFT_Y 5
 
+/// Mirrors scShadeMaxLights in Src/Renderer/SDFPageScene.hpp. The light buffer slots are passed as uint4s.
+#define SHADE_MAX_LIGHTS 16
+#define SHADE_LIGHT_VECTORS (SHADE_MAX_LIGHTS / 4)
+
 /// The nearest triangle is kept once per block of this many texels a side, as an index into the page's refs
 #define SDF_PAGE_NEAREST_BLOCK 2
 #define SDF_PAGE_NEAREST_SIZE (SDF_PAGE_TEXELS / SDF_PAGE_NEAREST_BLOCK)

@@ -29,6 +29,7 @@ enum class eShaderName : uint32
 	ProbeClipmapTrace,
 	ProbeClipmapBlend,
 	ProbeClipmapDebug,
+	ProbeClipmapResolve,
 
 	NumShaders,
 };
@@ -62,6 +63,7 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(ProbeClipmapTrace);
 		FX_ENUM_CASE_NAME(ProbeClipmapBlend);
 		FX_ENUM_CASE_NAME(ProbeClipmapDebug);
+		FX_ENUM_CASE_NAME(ProbeClipmapResolve);
 	default:
 		return "Unknown";
 	}

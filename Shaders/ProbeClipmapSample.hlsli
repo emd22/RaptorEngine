@@ -3,30 +3,36 @@
 
 #include "ProbeClipmapCommon.hlsli"
 
-// Reads the probe clipmap. Needs tIrradiance0-2 and tMoments0-2 (declared the F_Texture2D way), bState
-// (StructuredBuffer<uint>), bProbeData (StructuredBuffer<float4>) and CLIPMAP_SCENE, the ClipmapScene in the shader's
-// constants, declared by the including shader.
+// Reads the probe clipmap. Needs tIrradiance and tMoments (declared the F_Texture2D way), bProbes
+// (StructuredBuffer<uint4>) and CLIPMAP_SCENE, the ClipmapScene in the shader's constants, declared by the including
+// shader.
 
 /// Least standard deviation of a probe's depth, in metres
 #define CLIPMAP_MIN_DEPTH_DEVIATION 0.05
 #define CLIPMAP_MIN_WEIGHT 1e-6
-/// Probe weights below this are squashed towards zero, so barely visible probes don't leak
-#define CLIPMAP_WEIGHT_CRUSH 0.2
+/// Probe weights below this are squashed towards zero, so barely visible probes (behind a wall) don't leak
+#define CLIPMAP_WEIGHT_CRUSH 0.05
 
 /// Receivers are moved this much of a probe spacing along their normal and towards the viewer before the visibility
 /// test, so a surface doesn't fall behind its own depth (after DDGI, Majercik et al. 2019)
 #define CLIPMAP_NORMAL_BIAS 0.05
 #define CLIPMAP_VIEW_BIAS 0.2
 
-/// Over this many probes before a level's window ends, pixels dither over to the next coarser level
+/// Over this many probes before a level's usable window ends, pixels blend over to the next coarser level
 #define CLIPMAP_BLEND_PROBES 2.0
+
+/// A cell whose filled probes have less than this much of the trilinear weight is read from the next coarser level
+#define CLIPMAP_MIN_VALID 1e-3
+
+/// Probes behind the receiver's surface get this little of their weight
+#define CLIPMAP_BEHIND_WEIGHT 1e-3
 
 struct ClipmapGatherResult
 {
 	/// Irradiance / pi along the diffuse normal and along the reflection
 	float3 vDiffuse;
 	float3 vSpecular;
-	/// The level that was read, CLIPMAP_LEVELS where none holds the surface
+	/// The finest level that was read, CLIPMAP_LEVELS where none holds the surface
 	uint uiLevel;
 	/// Trilinear weight of the filled probes around the surface
 	float fValid;
@@ -34,51 +40,21 @@ struct ClipmapGatherResult
 	float fVisibility;
 };
 
-float2 ClipmapTileUV(uint slot, uint size, float3 direction, float2 image_size)
-{
-	const float2 origin = float2(ClipmapTileOrigin(slot, size + 2)) + 1.0;
-	const float2 texel = origin + (ClipmapDirectionToOct(direction) * 0.5 + 0.5) * float(size);
-
-	return texel / image_size;
-}
-
-float3 ClipmapSampleIrradiance(Texture2D image, SamplerState image_sampler, uint slot, float3 direction)
-{
-	const float2 image_size = float2(CLIPMAP_TILE_COLUMNS, CLIPMAP_GRID_Z) * (CLIPMAP_IRRADIANCE_SIZE + 2);
-	const float2 uv = ClipmapTileUV(slot, CLIPMAP_IRRADIANCE_SIZE, direction, image_size);
-
-	return image.SampleLevel(image_sampler, uv, 0.0).rgb;
-}
-
-// A level is picked once for everything read around a point, so these branch on it: reading every level's image
-// and selecting would triple the texture reads
-
 float3 ClipmapSampleIrradiance(uint level, uint slot, float3 direction)
 {
-	if (level == 0) {
-		return ClipmapSampleIrradiance(F_TextureName(tIrradiance0), tIrradiance0, slot, direction);
-	}
-
-	if (level == 1) {
-		return ClipmapSampleIrradiance(F_TextureName(tIrradiance1), tIrradiance1, slot, direction);
-	}
-
-	return ClipmapSampleIrradiance(F_TextureName(tIrradiance2), tIrradiance2, slot, direction);
+	return F_SampleLevel(tIrradiance, ClipmapAtlasUV(level, slot, CLIPMAP_IRRADIANCE_SIZE, direction), 0.0).rgb;
 }
 
 /// The mean distance and the mean squared distance. Bilinear filtering them keeps the spread between texels in the
 /// variance, which softens the visibility at occluder edges.
-float2 ClipmapSampleMoments(Texture2D image, SamplerState image_sampler, uint size, uint slot, float3 direction)
+float2 ClipmapSampleMoments(uint level, uint slot, float3 direction)
 {
-	const float2 image_size = float2(CLIPMAP_TILE_COLUMNS, CLIPMAP_GRID_Z) * float(size + 2);
-	const float2 uv = ClipmapTileUV(slot, size, direction, image_size);
-
-	return image.SampleLevel(image_sampler, uv, 0.0).rg;
+	return F_SampleLevel(tMoments, ClipmapAtlasUV(level, slot, CLIPMAP_MOMENTS_SIZE, direction), 0.0).rg;
 }
 
 /// Chebyshev's bound on the visibility of a receiver `distance` away, with a variance floor of the angle one depth
-/// texel of the level covers
-float ClipmapChebyshev(uint level, float distance, float2 moments)
+/// texel covers
+float ClipmapChebyshev(float distance, float2 moments)
 {
 	// tan(sqrt(pi) / size), half the angle covered by an average texel
 	const float texel_slope = 0.11166;
@@ -91,12 +67,6 @@ float ClipmapChebyshev(uint level, float distance, float2 moments)
 
 	return select(distance <= mean, 1.0, variance / (variance + d * d));
 }
-
-/// A cell whose filled probes have less than this much of the trilinear weight is read from the next coarser level
-#define CLIPMAP_MIN_VALID 1e-3
-
-/// Probes behind the receiver's surface get this little of their weight
-#define CLIPMAP_BEHIND_WEIGHT 1e-3
 
 /**
  * Weight of a probe by where it is against the receiver's surface: full in front of it, falling to almost nothing a
@@ -112,51 +82,56 @@ float ClipmapFacingWeight(float3 position, float3 normal, float3 probe_position)
 	return select(len < 1e-4, 1.0, facing * facing + CLIPMAP_BEHIND_WEIGHT);
 }
 
-bool ClipmapIsValid(uint level, uint slot) { return HAS_FLAG(bState[level * CLIPMAP_PROBES_PER_LEVEL + slot], CLIPMAP_STATE_VALID); }
-
-bool ClipmapIsActive(float4 probe_data) { return HAS_FLAG(asuint(probe_data.w), CLIPMAP_PROBE_ACTIVE); }
+ClipmapProbe ClipmapLoadProbe(uint level, int3 probe)
+{
+	return ClipmapDecodeProbe(bProbes[ClipmapProbeIndex(level, ClipmapSlot(probe))], probe);
+}
 
 /**
- * The finest level whose window holds every corner of the probe cell around `position`, or the next coarser one where
- * `dither` (in [0, 1)) falls inside the band at the window's edge. `bias` is how far the receiver is moved before it
- * is looked up, in probe spacings, which is the same on every level.
+ * How far inside level `level`'s usable window `position` is, in probes. Every corner of the probe cell around a point
+ * is in the window while this is positive. It is measured from the window's centre, which follows the camera smoothly,
+ * so the hand over band moves with the camera instead of jumping a probe at a time.
  */
-uint ClipmapFindLevel(float3 position, float3 bias, float dither, out bool found)
+float ClipmapWindowEdge(uint level, float3 position, float3 bias)
 {
-	const float3 last = float3(CLIPMAP_GRID_X - 1, CLIPMAP_GRID_Y - 1, CLIPMAP_GRID_Z - 1);
+	const ClipmapLevel clip = CLIPMAP_SCENE.Levels[level];
+	const float3 half_extent = float3(CLIPMAP_GRID_X, CLIPMAP_GRID_Y, CLIPMAP_GRID_Z) * 0.5 - 2.0;
+	const float3 to_edge = half_extent - abs(position * clip.vParams.y + bias - clip.vCenter.xyz);
 
+	return min(to_edge.x, min(to_edge.y, to_edge.z));
+}
+
+/**
+ * The finest level whose window holds the probe cell around `position`, and `out_coarser_share`, how much of the next
+ * coarser level is blended in near the window's edge. `bias` is how far the receiver is moved before it is looked up,
+ * in probe spacings, which is the same on every level.
+ */
+uint ClipmapFindLevel(float3 position, float3 bias, out bool found, out float out_coarser_share)
+{
 	found = false;
 	uint chosen = CLIPMAP_LEVELS - 1;
 	float edge = 0.0;
 
 	for (uint level = CLIPMAP_LEVELS; level > 0; level--) {
-		const ClipmapLevel clip = CLIPMAP_SCENE.Levels[level - 1];
-		const float3 local = position * clip.vParams.y + bias - float3(clip.vOrigin.xyz);
-		const bool inside = and(all(local >= 0.0), all(local < last));
-
-		const float3 to_edge = min(local, last - local);
-		const float level_edge = min(to_edge.x, min(to_edge.y, to_edge.z));
+		const float level_edge = ClipmapWindowEdge(level - 1, position, bias);
+		const bool inside = level_edge > 0.0;
 
 		chosen = select(inside, level - 1, chosen);
 		edge = select(inside, level_edge, edge);
 		found = or(found, inside);
 	}
 
-	const float coarser_share = saturate(1.0 - edge / CLIPMAP_BLEND_PROBES);
-	const bool use_coarser = and(chosen + 1 < CLIPMAP_LEVELS, dither < coarser_share);
+	out_coarser_share = select(chosen + 1 < CLIPMAP_LEVELS, saturate(1.0 - edge / CLIPMAP_BLEND_PROBES), 0.0);
 
-	return select(use_coarser, chosen + 1, chosen);
+	return chosen;
 }
 
-/// The gather from the eight probes of `level` around a receiver, out of that level's images. `with_specular` is a
-/// constant at every call, so the reads along `reflected` fold away where it is false.
-ClipmapGatherResult ClipmapGatherLevel(Texture2D irradiance, SamplerState irradiance_sampler, Texture2D moments,
-									   SamplerState moments_sampler, uint level, float3 position, float3 bias,
-									   float3 geometric_normal, float3 diffuse_normal, float3 reflected,
-									   const bool with_specular)
+/// The gather from the eight probes of `level` around a receiver. `with_specular` is a constant at every call, so the
+/// reads along `reflected` fold away where it is false.
+ClipmapGatherResult ClipmapGatherLevel(uint level, float3 position, float3 bias, float3 geometric_normal,
+									   float3 diffuse_normal, float3 reflected, const bool with_specular)
 {
 	const ClipmapLevel clip = CLIPMAP_SCENE.Levels[level];
-	const uint moments_size = select(level == 0, CLIPMAP_MOMENTS_SIZE_0, CLIPMAP_MOMENTS_SIZE);
 
 	const float3 biased = position + bias * clip.vParams.x;
 	const float3 local = biased * clip.vParams.y;
@@ -173,36 +148,34 @@ ClipmapGatherResult ClipmapGatherLevel(Texture2D irradiance, SamplerState irradi
 		const int3 offset = int3(corner, corner >> 1, corner >> 2) & 1;
 		const int3 probe = int3(base) + offset;
 		const uint slot = ClipmapSlot(probe);
+		const ClipmapProbe data = ClipmapDecodeProbe(bProbes[ClipmapProbeIndex(level, slot)], probe);
 
 		const float3 axis = lerp(1.0 - cell_frac, cell_frac, float3(offset));
-		const float trilinear = axis.x * axis.y * axis.z;
-
-		const bool is_valid = ClipmapIsValid(level, slot);
-		const float valid_trilinear = select(is_valid, trilinear, 0.0);
+		const float valid_trilinear = select(data.bReady, axis.x * axis.y * axis.z, 0.0);
 		valid += valid_trilinear;
 
-		const float4 probe_data = bProbeData[ClipmapProbeDataIndex(level, probe)];
-		const float3 probe_position = ClipmapProbePosition(clip, probe) + probe_data.xyz;
+		const float3 probe_position = ClipmapProbePosition(clip, probe) + data.vOffset;
 		const float3 to_receiver = biased - probe_position;
 		const float distance = length(to_receiver);
 		const float3 direction = to_receiver / max(distance, 1e-4);
 
-		const float2 depth = ClipmapSampleMoments(moments, moments_sampler, moments_size, slot, direction);
-		const float visibility = select(distance < 1e-4, 1.0, ClipmapChebyshev(level, distance, depth));
+		const float2 depth = ClipmapSampleMoments(level, slot, direction);
+		const float visibility = select(distance < 1e-4, 1.0, ClipmapChebyshev(distance, depth));
 		visibility_sum += visibility * valid_trilinear;
 
-		float weight = max(ClipmapFacingWeight(position, geometric_normal, probe_position) * visibility * visibility *
-							   visibility,
-						   CLIPMAP_MIN_WEIGHT);
+		// Visibility weighs in linearly. Cubed, as DDGI has it, a receiver a little past a probe's mean depth (most of
+		// a flat wall, seen from the probes half a cell in front of it) lost nearly all of that probe's weight, so
+		// each part of the wall took the light of whichever probe happened to see it best, in blotches.
+		float weight = max(ClipmapFacingWeight(position, geometric_normal, probe_position) * visibility, CLIPMAP_MIN_WEIGHT);
 		weight = select(weight < CLIPMAP_WEIGHT_CRUSH, weight * (weight * weight / (CLIPMAP_WEIGHT_CRUSH * CLIPMAP_WEIGHT_CRUSH)),
 						weight);
-		weight *= select(ClipmapIsActive(probe_data), 1.0, CLIPMAP_INACTIVE_WEIGHT);
+		weight *= select(data.bActive, 1.0, CLIPMAP_INACTIVE_WEIGHT);
 		weight *= valid_trilinear;
 
-		diffuse += ClipmapSampleIrradiance(irradiance, irradiance_sampler, slot, diffuse_normal) * weight;
+		diffuse += ClipmapSampleIrradiance(level, slot, diffuse_normal) * weight;
 
 		if (with_specular) {
-			specular += ClipmapSampleIrradiance(irradiance, irradiance_sampler, slot, reflected) * weight;
+			specular += ClipmapSampleIrradiance(level, slot, reflected) * weight;
 		}
 
 		total += weight;
@@ -223,39 +196,56 @@ ClipmapGatherResult ClipmapGatherLevel(Texture2D irradiance, SamplerState irradi
 }
 
 ClipmapGatherResult ClipmapGatherAt(float3 position, float3 geometric_normal, float3 view_direction, float3 diffuse_normal,
-									float3 reflected, float dither, const bool with_specular)
+									float3 reflected, const bool with_specular)
 {
 	const float3 bias = geometric_normal * CLIPMAP_NORMAL_BIAS + view_direction * CLIPMAP_VIEW_BIAS;
 
 	bool found;
-	uint level = ClipmapFindLevel(position, bias, dither, found);
+	float coarser_share;
+	const uint first_level = ClipmapFindLevel(position, bias, found, coarser_share);
 
 	ClipmapGatherResult result;
+	result.vDiffuse = float3(0.0, 0.0, 0.0);
+	result.vSpecular = float3(0.0, 0.0, 0.0);
+	result.uiLevel = CLIPMAP_LEVELS;
+	result.fValid = 0.0;
+	result.fVisibility = 0.0;
 
-	// A cell none of whose probes is filled (all in walls or outside the map, or not traced yet) has nothing to give,
-	// so the next coarser level is read in its place. That is rare, which is why it is a loop and not a blend.
-	for (uint attempt = 0; attempt < CLIPMAP_LEVELS; attempt++) {
-		if (level == 0) {
-			result = ClipmapGatherLevel(F_TextureName(tIrradiance0), tIrradiance0, F_TextureName(tMoments0), tMoments0, 0,
-										position, bias, geometric_normal, diffuse_normal, reflected, with_specular);
-		}
-		else if (level == 1) {
-			result = ClipmapGatherLevel(F_TextureName(tIrradiance1), tIrradiance1, F_TextureName(tMoments1), tMoments1, 1,
-										position, bias, geometric_normal, diffuse_normal, reflected, with_specular);
-		}
-		else {
-			result = ClipmapGatherLevel(F_TextureName(tIrradiance2), tIrradiance2, F_TextureName(tMoments2), tMoments2, 2,
-										position, bias, geometric_normal, diffuse_normal, reflected, with_specular);
-		}
+	// The first level with filled probes keeps all but the coarser share near its window's edge, and the next one
+	// with filled probes takes what is left. A cell with none filled (all in walls or outside the map, or not traced
+	// yet) has nothing to give, so it is passed over. Most pixels read one level, the ones in a band two.
+	float taken = 0.0;
+	float keep = 1.0 - coarser_share;
 
-		if (result.fValid > CLIPMAP_MIN_VALID || level + 1 >= CLIPMAP_LEVELS) {
+	[loop]
+	for (uint level = first_level; level < CLIPMAP_LEVELS; level++) {
+		const ClipmapGatherResult gather = ClipmapGatherLevel(level, position, bias, geometric_normal, diffuse_normal,
+															  reflected, with_specular);
+
+		const bool usable = gather.fValid > CLIPMAP_MIN_VALID;
+		const float share = select(usable, select(level + 1 < CLIPMAP_LEVELS, keep, 1.0) * (1.0 - taken), 0.0);
+
+		result.vDiffuse += gather.vDiffuse * share;
+		result.vSpecular += gather.vSpecular * share;
+		result.fValid += gather.fValid * share;
+		result.fVisibility += gather.fVisibility * share;
+		result.uiLevel = select(and(usable, result.uiLevel == CLIPMAP_LEVELS), level, result.uiLevel);
+
+		taken += share;
+		keep = select(usable, 1.0, keep);
+
+		if (taken > 0.999) {
 			break;
 		}
-
-		level++;
 	}
 
-	result.uiLevel = select(found, level, CLIPMAP_LEVELS);
+	const float inv_taken = 1.0 / max(taken, 1e-6);
+
+	result.vDiffuse *= inv_taken;
+	result.vSpecular *= inv_taken;
+	result.fValid *= inv_taken;
+	result.fVisibility = select(taken > 0.0, result.fVisibility * inv_taken, 1.0);
+	result.uiLevel = select(found, result.uiLevel, CLIPMAP_LEVELS);
 
 	return result;
 }
@@ -263,22 +253,71 @@ ClipmapGatherResult ClipmapGatherAt(float3 position, float3 geometric_normal, fl
 /**
  * Irradiance / pi along `diffuse_normal` and along `reflected` at a surface, from the eight probes around it, the
  * weights worked out once. `geometric_normal` and `view_direction` (unit, from the surface towards the viewer) move the
- * receiver off its surface, and `geometric_normal` weights the probes behind it down. `dither` in [0, 1) picks between
- * two levels near a window's edge.
+ * receiver off its surface, and `geometric_normal` weights the probes behind it down.
  */
 ClipmapGatherResult ClipmapGather(float3 position, float3 geometric_normal, float3 view_direction, float3 diffuse_normal,
-								  float3 reflected, float dither)
+								  float3 reflected)
 {
-	return ClipmapGatherAt(position, geometric_normal, view_direction, diffuse_normal, reflected, dither, true);
+	return ClipmapGatherAt(position, geometric_normal, view_direction, diffuse_normal, reflected, true);
 }
 
 /// ClipmapGather() without the specular term, which is left black
-ClipmapGatherResult ClipmapGatherDiffuse(float3 position, float3 normal, float3 view_direction, float dither)
+ClipmapGatherResult ClipmapGatherDiffuse(float3 position, float3 normal, float3 view_direction)
 {
-	return ClipmapGatherAt(position, normal, view_direction, normal, normal, dither, false);
+	return ClipmapGatherAt(position, normal, view_direction, normal, normal, false);
 }
 
-/// Interleaved gradient noise (Jimenez 2014), for dithering by screen position
-float ClipmapScreenDither(float2 pixel) { return frac(52.9829189 * frac(dot(pixel, float2(0.06711056, 0.00583715)))); }
+/**
+ * The light that reaches a probe ray's hit before bouncing off it: irradiance / pi along `normal` from the eight probes
+ * of the finest level around `position` (or the next one where none of them is filled), without their depth test and
+ * without blending levels. The full gather is most of a ray's cost; this one reads a third as much. The facing weight
+ * still drops the probes behind the hit's surface, which are the ones a wall would otherwise let through. Returns a
+ * negative value where no level holds the point. `view_direction` points back towards the probe that traced the ray.
+ */
+float3 ClipmapGatherBounce(float3 position, float3 normal, float3 view_direction)
+{
+	const float3 bias = normal * CLIPMAP_NORMAL_BIAS + view_direction * CLIPMAP_VIEW_BIAS;
+
+	bool found;
+	float coarser_share;
+	uint level = ClipmapFindLevel(position, bias, found, coarser_share);
+
+	float3 diffuse = float3(0.0, 0.0, 0.0);
+	float total = 0.0;
+
+	[loop]
+	for (; level < CLIPMAP_LEVELS; level++) {
+		const ClipmapLevel clip = CLIPMAP_SCENE.Levels[level];
+		const float3 local = (position + bias * clip.vParams.x) * clip.vParams.y;
+		const float3 base = floor(local);
+		const float3 cell_frac = local - base;
+
+		diffuse = float3(0.0, 0.0, 0.0);
+		total = 0.0;
+
+		for (uint corner = 0; corner < 8; corner++) {
+			const int3 offset = int3(corner, corner >> 1, corner >> 2) & 1;
+			const int3 probe = int3(base) + offset;
+			const uint slot = ClipmapSlot(probe);
+			const ClipmapProbe data = ClipmapDecodeProbe(bProbes[ClipmapProbeIndex(level, slot)], probe);
+
+			const float3 axis = lerp(1.0 - cell_frac, cell_frac, float3(offset));
+			const float3 probe_position = ClipmapProbePosition(clip, probe) + data.vOffset;
+
+			float weight = axis.x * axis.y * axis.z * ClipmapFacingWeight(position, normal, probe_position);
+			weight *= select(data.bActive, 1.0, CLIPMAP_INACTIVE_WEIGHT);
+			weight = select(data.bReady, weight, 0.0);
+
+			diffuse += ClipmapSampleIrradiance(level, slot, normal) * weight;
+			total += weight;
+		}
+
+		if (total > CLIPMAP_MIN_VALID * 1e-2) {
+			break;
+		}
+	}
+
+	return select(and(found, total > 0.0), diffuse / max(total, 1e-30), float3(-1.0, -1.0, -1.0));
+}
 
 #endif

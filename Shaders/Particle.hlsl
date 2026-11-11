@@ -50,10 +50,8 @@ F_StructBuffer(bParticles, ParticleData, 0, 0);
 F_FrameData(ParticleConsts, Const, 1);
 
 // The runtime GI probes, see ProbeClipmap
-F_Texture2D(tIrradiance0, 3, 0)
-F_Texture2D(tIrradiance1, 4, 0)
-F_Texture2D(tIrradiance2, 5, 0)
-F_StructBuffer(bState, uint, 6, 0);
+F_Texture2D(tIrradiance, 3, 0)
+F_StructBuffer(bProbes, uint4, 6, 0);
 F_StructBuffer(bClipmapForward, ClipmapForwardData, 7, 0);
 
 #include "ProbeClipmapMean.hlsli"

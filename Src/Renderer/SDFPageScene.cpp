@@ -54,7 +54,7 @@ struct SDFPageDebugConsts
 	float32 Params[4] = {};
 	BakedSunShadowGpu BakedSun;
 	/// Light buffer slots shaded at each hit
-	uint32 LightIndices[4] = {};
+	uint32 LightIndices[SDFPageScene::scShadeMaxLights] = {};
 	/// Light count, flags, probe stride
 	uint32 Lights[4] = {};
 	/// Radiance of the rays that miss
@@ -66,7 +66,7 @@ static_assert(sizeof(SDFPageSceneGpu) == 192);
 static_assert(sizeof(CompiledMapSDFPageTriangle) == 48);
 static_assert(sizeof(SDFPageUpdateConsts) == 32);
 static_assert(sizeof(BakedSunShadowGpu) == 80);
-static_assert(sizeof(SDFPageDebugConsts) == 192 + 64 + 16 + 16 + 16 + 80 + 16 + 16 + 16);
+static_assert(sizeof(SDFPageDebugConsts) == 192 + 64 + 16 + 16 + 16 + 80 + 64 + 16 + 16);
 
 
 void ComputeBarrier(const CommandBuffer& cmd)

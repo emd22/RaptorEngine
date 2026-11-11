@@ -3,27 +3,13 @@
 
 #include "ProbeClipmapForward.hlsli"
 
-// The light around a point in the open, for fog and particles. Needs tIrradiance0-2 (declared the F_Texture2D way),
-// bState (StructuredBuffer<uint>) and bClipmapForward (StructuredBuffer<ClipmapForwardData>), declared by the
+// The light around a point in the open, for fog and particles. Needs tIrradiance (declared the F_Texture2D way),
+// bProbes (StructuredBuffer<uint4>) and bClipmapForward (StructuredBuffer<ClipmapForwardData>), declared by the
 // including shader.
 
 float3 ClipmapMeanSampleIrradiance(uint level, uint slot, float3 direction)
 {
-	const float2 image_size = float2(CLIPMAP_TILE_COLUMNS, CLIPMAP_GRID_Z) * (CLIPMAP_IRRADIANCE_SIZE + 2);
-	const float2 texel = float2(ClipmapTileOrigin(slot, CLIPMAP_IRRADIANCE_SIZE + 2)) + 1.0 +
-						 (ClipmapDirectionToOct(direction) * 0.5 + 0.5) * float(CLIPMAP_IRRADIANCE_SIZE);
-	const float2 uv = texel / image_size;
-
-	// One level is read per point, so this branches: selecting would read all three images
-	if (level == 0) {
-		return F_SampleLevel(tIrradiance0, uv, 0.0).rgb;
-	}
-
-	if (level == 1) {
-		return F_SampleLevel(tIrradiance1, uv, 0.0).rgb;
-	}
-
-	return F_SampleLevel(tIrradiance2, uv, 0.0).rgb;
+	return F_SampleLevel(tIrradiance, ClipmapAtlasUV(level, slot, CLIPMAP_IRRADIANCE_SIZE, direction), 0.0).rgb;
 }
 
 /**
@@ -33,14 +19,14 @@ float3 ClipmapMeanSampleIrradiance(uint level, uint slot, float3 direction)
 float3 ClipmapMeanRadiance(float3 position_ws)
 {
 	const ClipmapScene scene = bClipmapForward[0].Clipmap;
-	const float3 last = float3(CLIPMAP_GRID_X - 1, CLIPMAP_GRID_Y - 1, CLIPMAP_GRID_Z - 1);
+	const float3 half_extent = float3(CLIPMAP_GRID_X, CLIPMAP_GRID_Y, CLIPMAP_GRID_Z) * 0.5 - 2.0;
 
 	uint level = CLIPMAP_LEVELS - 1;
 	bool found = false;
 
 	for (uint index = CLIPMAP_LEVELS; index > 0; index--) {
-		const float3 local = position_ws * scene.Levels[index - 1].vParams.y - float3(scene.Levels[index - 1].vOrigin.xyz);
-		const bool inside = and(all(local >= 0.0), all(local < last));
+		const ClipmapLevel clip = scene.Levels[index - 1];
+		const bool inside = all(abs(position_ws * clip.vParams.y - clip.vCenter.xyz) < half_extent);
 
 		level = select(inside, index - 1, level);
 		found = or(found, inside);
@@ -61,10 +47,11 @@ float3 ClipmapMeanRadiance(float3 position_ws)
 		[unroll]
 		for (uint corner = 0; corner < 8; corner++) {
 			const int3 offset = int3(corner, corner >> 1, corner >> 2) & 1;
-			const uint slot = ClipmapSlot(int3(base) + offset);
+			const int3 probe = int3(base) + offset;
+			const uint slot = ClipmapSlot(probe);
 
 			const float3 axis = lerp(1.0 - cell_frac, cell_frac, float3(offset));
-			const bool is_valid = HAS_FLAG(bState[ClipmapProbeIndex(level, slot)], CLIPMAP_STATE_VALID);
+			const bool is_valid = ClipmapDecodeProbe(bProbes[ClipmapProbeIndex(level, slot)], probe).bReady;
 			const float weight = select(is_valid, axis.x * axis.y * axis.z, 0.0);
 
 			const float3 mean = (ClipmapMeanSampleIrradiance(level, slot, float3(0.0, 1.0, 0.0)) +

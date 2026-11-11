@@ -31,7 +31,6 @@ constexpr uint32 scJobDirtyShift = 24;
 /// Share of the budget left after the new probes that the dirty ones may take, so the rest keep being refreshed
 constexpr uint32 scDirtyBudgetNumerator = 3;
 constexpr uint32 scDirtyBudgetDenominator = 4;
-constexpr uint32 scStateValid = 0x01;
 
 /// A slot traced for the first time this frame still holds the probe it had before until the blend, so it counts
 /// as unfilled for this frame's reads
@@ -58,15 +57,14 @@ struct ProbeClipmapConsts
 {
 	SDFPageSceneGpu SDFPages;
 	ProbeClipmapLevelGpu Levels[ProbeClipmap::scLevelCount];
-	float32 RayRotation[16] = {};
 	BakedSunShadowGpu BakedSun;
 
-	uint32 LightIndices[4] = {};
+	uint32 LightIndices[SDFPageScene::scShadeMaxLights] = {};
 
 	/// Light count, shading flags
 	uint32 Lights[4] = {};
 
-	/// Job count, frame, flags, proxy count
+	/// Job count, frame (seeds the ray rotations), flags, proxy count
 	uint32 Info[4] = {};
 
 	/// Hysteresis, fast hysteresis, change threshold, moment sharpness
@@ -107,10 +105,11 @@ struct ProbeClipmapForwardData
 constexpr uint32 scForwardFlagBakedSun = 0x01;
 
 static_assert(sizeof(ProbeClipmapForwardData) <= ProbeClipmap::scForwardDataFrameSize);
-static_assert(sizeof(ProbeClipmapLevelGpu) == 32);
+static_assert(sizeof(ProbeClipmapLevelGpu) == 48);
 static_assert(sizeof(ProbeClipmapProxyGpu) == 64);
-static_assert(sizeof(ProbeClipmapConsts) == 192 + 96 + 64 + 80 + 16 * 6 + 64 * ProbeClipmap::scMaxProxies);
-static_assert(sizeof(ProbeClipmapDebugConsts) == 96 + 64 + 16 * 3);
+static_assert(sizeof(ProbeClipmapConsts) ==
+			  192 + 144 + 80 + 4 * SDFPageScene::scShadeMaxLights + 16 * 5 + 64 * ProbeClipmap::scMaxProxies);
+static_assert(sizeof(ProbeClipmapDebugConsts) == 144 + 64 + 16 * 3);
 
 /// Mirrors SHADE_FLAG_BAKED_SUN in Shaders/SDFPageShade.hlsli
 constexpr uint32 scShadeFlagBakedSun = 0x01;
@@ -143,56 +142,13 @@ void SlotProbe(uint32 slot, const int32 origin[3], int32 out_probe[3])
 	}
 }
 
-uint32 Hash(uint32 x)
-{
-	x ^= x >> 16;
-	x *= 0x7feb352dU;
-	x ^= x >> 15;
-	x *= 0x846ca68bU;
-	x ^= x >> 16;
-	return x;
-}
-
-float32 HashToUnit(uint32 x) { return static_cast<float32>(Hash(x) & 0xFFFFFFU) / static_cast<float32>(0x1000000); }
-
-/// A uniformly random rotation as rows that row vectors are multiplied by (Shoemake)
-void RandomRotation(uint32 seed, float32 out_matrix[16])
-{
-	constexpr float32 scTau = FX_2PI;
-
-	const float32 u1 = HashToUnit(seed * 3U + 0U);
-	const float32 u2 = HashToUnit(seed * 3U + 1U);
-	const float32 u3 = HashToUnit(seed * 3U + 2U);
-
-	const float32 x = std::sqrt(1.0f - u1) * std::sin(scTau * u2);
-	const float32 y = std::sqrt(1.0f - u1) * std::cos(scTau * u2);
-	const float32 z = std::sqrt(u1) * std::sin(scTau * u3);
-	const float32 w = std::sqrt(u1) * std::cos(scTau * u3);
-
-	const float32 rows[3][3] = {
-		{ 1.0f - 2.0f * (y * y + z * z), 2.0f * (x * y + w * z), 2.0f * (x * z - w * y) },
-		{ 2.0f * (x * y - w * z), 1.0f - 2.0f * (x * x + z * z), 2.0f * (y * z + w * x) },
-		{ 2.0f * (x * z + w * y), 2.0f * (y * z - w * x), 1.0f - 2.0f * (x * x + y * y) },
-	};
-
-	memset(out_matrix, 0, sizeof(float32) * 16);
-
-	for (uint32 row = 0; row < 3; row++) {
-		for (uint32 column = 0; column < 3; column++) {
-			out_matrix[row * 4 + column] = rows[row][column];
-		}
-	}
-
-	out_matrix[15] = 1.0f;
-}
-
-Image* CreateTileImage(uint32 tile_size, eImageFormat format)
+/// An atlas of every level's tiles of `tile_size` texels a side (border included)
+Image* CreateTileAtlas(uint32 tile_size, eImageFormat format)
 {
 	Image* image = gTextureManager->NewTexture();
 
 	image->Create(
-		eImageType::Flat,
-		UVec2(ProbeClipmap::scTileColumns * tile_size, static_cast<uint32>(ProbeClipmap::scGridZ) * tile_size), 1,
+		eImageType::Flat, UVec2(ProbeClipmap::scTileColumns * tile_size, ProbeClipmap::scTileRows * tile_size), 1,
 		format, VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		eImageAspectFlag::Color, eImageCreateFlags::IsTarget);
@@ -257,12 +213,10 @@ void ProbeClipmap::Create()
 		level.Valid.InitSize(scProbesPerLevel, 0);
 		level.Dirty.InitSize(scProbesPerLevel, 0);
 		level.JobStamp.InitSize(scProbesPerLevel, 0);
-
-		const uint32 moments_size = (level_index == 0) ? scMomentsSize0 : scMomentsSize;
-
-		mpIrradiance[level_index] = CreateTileImage(scIrradianceSize + 2, eImageFormat::RGBA16_Float);
-		mpMoments[level_index] = CreateTileImage(moments_size + 2, eImageFormat::RG16_Float);
 	}
+
+	mpIrradiance = CreateTileAtlas(scIrradianceSize + 2, eImageFormat::RGBA16_Float);
+	mpMoments = CreateTileAtlas(scMomentsSize + 2, eImageFormat::RG16_Float);
 
 	mTrackedLights.InitCapacity(Limits::MaxActiveLights);
 	mProxies.InitCapacity(scMaxProxies);
@@ -274,12 +228,8 @@ void ProbeClipmap::Create()
 	mRays.Create(eGpuBufferType::Storage, static_cast<uint64>(scMaxJobsPerFrame) * scRayCount * sizeof(float32) * 4,
 				 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::None);
 
-	mState.Create(eGpuBufferType::Storage,
-				  static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(uint32) * FramesInFlight,
-				  VMA_MEMORY_USAGE_CPU_TO_GPU, eGpuBufferFlags::PersistentMapped);
-
-	mProbeData.Create(eGpuBufferType::Storage, scProbeDataSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-					  eGpuBufferFlags::TransferReceiver);
+	mProbes.Create(eGpuBufferType::Storage, scProbesSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+				   eGpuBufferFlags::TransferReceiver);
 
 	mForwardData.Create(eGpuBufferType::Storage, scForwardDataFrameSize * FramesInFlight, VMA_MEMORY_USAGE_CPU_TO_GPU,
 						eGpuBufferFlags::PersistentMapped);
@@ -291,8 +241,7 @@ void ProbeClipmap::Destroy()
 {
 	mJobs.Destroy();
 	mRays.Destroy();
-	mState.Destroy();
-	mProbeData.Destroy();
+	mProbes.Destroy();
 	mForwardData.Destroy();
 }
 
@@ -349,14 +298,9 @@ void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
 						 static_cast<uint64>(scMaxJobsPerFrame) * sizeof(uint32));
 	gPSOBuild->AddBuffer(11, 0, eShaderType::Compute, &mRays, 0, VK_WHOLE_SIZE);
 
-	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
-		gPSOBuild->AddImage(12 + level_index, 0, eShaderType::Compute, mpIrradiance[level_index], linear_sampler);
-		gPSOBuild->AddImage(15 + level_index, 0, eShaderType::Compute, mpMoments[level_index], linear_sampler);
-	}
-
-	gPSOBuild->AddBuffer(18, 0, eShaderType::Compute, &mState, 0,
-						 static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(uint32));
-	gPSOBuild->AddBuffer(19, 0, eShaderType::Compute, &mProbeData, 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddImage(12, 0, eShaderType::Compute, mpIrradiance, linear_sampler);
+	gPSOBuild->AddImage(15, 0, eShaderType::Compute, mpMoments, linear_sampler);
+	gPSOBuild->AddBuffer(19, 0, eShaderType::Compute, &mProbes, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
 
@@ -366,12 +310,9 @@ void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
 						 static_cast<uint64>(scMaxJobsPerFrame) * sizeof(uint32));
 	gPSOBuild->AddBuffer(1, 0, eShaderType::Compute, &mRays, 0, VK_WHOLE_SIZE);
 
-	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
-		gPSOBuild->AddStorageImage(2 + level_index, 0, eShaderType::Compute, mpIrradiance[level_index]);
-		gPSOBuild->AddStorageImage(5 + level_index, 0, eShaderType::Compute, mpMoments[level_index]);
-	}
-
-	gPSOBuild->AddBuffer(9, 0, eShaderType::Compute, &mProbeData, 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddStorageImage(2, 0, eShaderType::Compute, mpIrradiance);
+	gPSOBuild->AddStorageImage(5, 0, eShaderType::Compute, mpMoments);
+	gPSOBuild->AddBuffer(9, 0, eShaderType::Compute, &mProbes, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
 
@@ -380,15 +321,10 @@ void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
 	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Compute, depth, point_sampler);
 	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Compute, normals, point_sampler);
 
-	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
-		gPSOBuild->AddImage(2 + level_index, 0, eShaderType::Compute, mpIrradiance[level_index], linear_sampler);
-		gPSOBuild->AddImage(5 + level_index, 0, eShaderType::Compute, mpMoments[level_index], linear_sampler);
-	}
-
-	gPSOBuild->AddBuffer(8, 0, eShaderType::Compute, &mState, 0,
-						 static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(uint32));
+	gPSOBuild->AddImage(2, 0, eShaderType::Compute, mpIrradiance, linear_sampler);
+	gPSOBuild->AddImage(5, 0, eShaderType::Compute, mpMoments, linear_sampler);
 	gPSOBuild->AddStorageImage(9, 0, eShaderType::Compute, &lit->GetImage());
-	gPSOBuild->AddBuffer(10, 0, eShaderType::Compute, &mProbeData, 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddBuffer(10, 0, eShaderType::Compute, &mProbes, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
 }
@@ -412,7 +348,7 @@ void ProbeClipmap::Reset()
 	mbHasTrackedLights = false;
 	mTrackedProxies.Clear();
 	mbHasTrackedProxies = false;
-	mbClearProbeData = true;
+	mbClearProbes = true;
 }
 
 void ProbeClipmap::SetProbeMask(const CompiledMapProbeMask& mask)
@@ -924,6 +860,10 @@ void ProbeClipmap::GetLevelConsts(ProbeClipmapLevelGpu* out_levels, const Settin
 		gpu.Params[1] = 1.0f / level.Spacing;
 		gpu.Params[2] = settings.RayLength;
 		gpu.Params[3] = settings.ConeSlope;
+
+		gpu.Center[0] = mCenter.X / level.Spacing;
+		gpu.Center[1] = mCenter.Y / level.Spacing;
+		gpu.Center[2] = mCenter.Z / level.Spacing;
 	}
 }
 
@@ -938,13 +878,17 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 		InitializeImages(cmd);
 	}
 
+	// The records are what every reader goes by for which probes are filled, so a new map starts with none
+	if (mbClearProbes) {
+		vkCmdFillBuffer(cmd.Get(), mProbes.Buffer, 0, VK_WHOLE_SIZE, 0);
+		ComputeBarrier(cmd);
+		mbClearProbes = false;
+	}
+
+	mCenter = center;
+
 	// A map that was not compiled has nothing to trace. Its surfaces are lit by the sky alone.
 	if (!pages.IsTraceable()) {
-		const uint32 state_size = scLevelCount * scProbesPerLevel * sizeof(uint32);
-
-		memset(static_cast<uint8*>(mState.pMappedBuffer) + frame * state_size, 0, state_size);
-		mState.FlushToGpu(frame * state_size, state_size);
-
 		WriteForwardData(frame, settings, settings.SkyRadiance);
 		return;
 	}
@@ -967,15 +911,10 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 
 	uint32 live_count[scLevelCount] = {};
 
-	uint32* state = reinterpret_cast<uint32*>(mState.pMappedBuffer) +
-					static_cast<uint64>(frame) * scLevelCount * scProbesPerLevel;
-
 	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
 		Level& level = mLevels[level_index];
-		uint32* level_state = state + static_cast<uint64>(level_index) * scProbesPerLevel;
 
 		for (uint32 slot = 0; slot < scProbesPerLevel; slot++) {
-			level_state[slot] = (level.Valid[slot] == 1) ? scStateValid : 0U;
 			live_count[level_index] += (level.Valid[slot] != 0 && level.Valid[slot] != scDead) ? 1U : 0U;
 
 			// A probe's first trace is all of its history, so it blends its next updates in fast, as if its light
@@ -986,9 +925,6 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 			}
 		}
 	}
-
-	const uint32 state_size = scLevelCount * scProbesPerLevel * sizeof(uint32);
-	mState.FlushToGpu(frame * state_size, state_size);
 
 	WriteForwardData(frame, settings, 0.0f);
 
@@ -1001,7 +937,6 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	ProbeClipmapConsts consts;
 	pages.GetSceneConsts(consts.SDFPages);
 	GetLevelConsts(consts.Levels, settings);
-	RandomRotation(gGraphics->GetElapsedFrameCount(), consts.RayRotation);
 
 	gGraphics->SelectShadeLights(center, settings.RayLength, consts.LightIndices, consts.Lights[0]);
 
@@ -1085,11 +1020,6 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	const uint32 columns = std::min(job_count, scJobColumns);
 	const uint32 rows = (job_count + scJobColumns - 1) / scJobColumns;
 
-	if (mbClearProbeData) {
-		vkCmdFillBuffer(cmd.Get(), mProbeData.Buffer, 0, VK_WHOLE_SIZE, 0);
-		mbClearProbeData = false;
-	}
-
 	ComputeBarrier(cmd);
 
 	// Trace. Every buffer binding is dynamic, so each takes an offset in binding order.
@@ -1101,19 +1031,17 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, frame * scMaxJobsPerFrame * sizeof(uint32));
 	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, frame * scLevelCount * scProbesPerLevel * sizeof(uint32));
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->SetFrameData(consts_offset);
 	gPipelineCache->Bind(ePipelineName::ProbeClipmapTrace, cmd);
 
 	vkCmdDispatch(cmd.Get(), columns, rows, 1);
+	gGraphics->MarkGpu(eGpuMarker::GITrace);
 
 	ComputeBarrier(cmd);
 
-	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
-		ImageBarrier(cmd, mpIrradiance[level_index], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-		ImageBarrier(cmd, mpMoments[level_index], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-	}
+	ImageBarrier(cmd, mpIrradiance, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+	ImageBarrier(cmd, mpMoments, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 
 	// Blend
 	gPipelineCache->AddBufferOffset(0, frame * scMaxJobsPerFrame * sizeof(uint32));
@@ -1125,10 +1053,8 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 
 	vkCmdDispatch(cmd.Get(), columns, rows, 1);
 
-	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
-		ImageBarrier(cmd, mpIrradiance[level_index], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		ImageBarrier(cmd, mpMoments[level_index], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	}
+	ImageBarrier(cmd, mpIrradiance, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	ImageBarrier(cmd, mpMoments, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void ProbeClipmap::WriteForwardData(uint32 frame, const Settings& settings, float32 fallback)
@@ -1155,18 +1081,17 @@ void ProbeClipmap::InitializeImages(CommandBuffer& cmd)
 	const VkClearColorValue zero {};
 	const VkImageSubresourceRange range { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1 };
 
-	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
-		Image* images[2] = { mpIrradiance[level_index], mpMoments[level_index] };
+	Image* images[2] = { mpIrradiance, mpMoments };
 
-		for (Image* image : images) {
-			ImageBarrier(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-			vkCmdClearColorImage(cmd.Get(), image->InternalImage, VK_IMAGE_LAYOUT_GENERAL, &zero, 1, &range);
-			ImageBarrier(cmd, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		}
+	for (Image* image : images) {
+		ImageBarrier(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+		vkCmdClearColorImage(cmd.Get(), image->InternalImage, VK_IMAGE_LAYOUT_GENERAL, &zero, 1, &range);
+		ImageBarrier(cmd, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
 
-	vkCmdFillBuffer(cmd.Get(), mProbeData.Buffer, 0, VK_WHOLE_SIZE, 0);
+	vkCmdFillBuffer(cmd.Get(), mProbes.Buffer, 0, VK_WHOLE_SIZE, 0);
 	ComputeBarrier(cmd);
+	mbClearProbes = false;
 
 	mbImagesInitialized = true;
 }
@@ -1206,7 +1131,6 @@ void ProbeClipmap::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 	// The spheres are drawn over what the lit target holds, so its contents are kept
 	ImageBarrier(cmd, lit, lit->ImageLayout, VK_IMAGE_LAYOUT_GENERAL);
 
-	gPipelineCache->AddBufferOffset(0, frame * scLevelCount * scProbesPerLevel * sizeof(uint32));
 	gPipelineCache->AddBufferOffset(0, 0);
 
 	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));

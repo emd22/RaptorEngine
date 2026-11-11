@@ -261,7 +261,6 @@ void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, renderer
 			gGraphics->GetDecalMaskFrameOffset(),
 			// The reflection probe buffer isn't paged per frame in flight
 			0,
-			gGraphics->GIClipmap.GetStateFrameOffset(gGraphics->GetFrameNumber()),
 			0,
 			gGraphics->GIClipmap.GetForwardDataFrameOffset(gGraphics->GetFrameNumber()),
 			0,
@@ -376,7 +375,6 @@ void World::ExecuteTransparentRenderLists()
 					gGraphics->GetDecalMaskFrameOffset(),
 					// The reflection probe buffer isn't paged per frame in flight
 					0,
-					gGraphics->GIClipmap.GetStateFrameOffset(gGraphics->GetFrameNumber()),
 					0,
 					gGraphics->GIClipmap.GetForwardDataFrameOffset(gGraphics->GetFrameNumber()),
 					0,
@@ -1328,6 +1326,9 @@ void World::Render(BaseCamera* shadow_camera)
 
 	gGraphics->RenderEarlyFrameEffects(camera);
 	gGraphics->MarkGpu(eGpuMarker::SSAO);
+
+	gGraphics->RenderGIResolve(camera);
+	gGraphics->MarkGpu(eGpuMarker::GIResolve);
 
 	gGraphics->BeginGeometry();
 

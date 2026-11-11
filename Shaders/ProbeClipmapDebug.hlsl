@@ -16,16 +16,11 @@ struct ProbeClipmapDebugConsts
 
 F_Texture2D(tDepth, 0, 0);
 F_Texture2D(tNormal, 1, 0);
-F_Texture2D(tIrradiance0, 2, 0);
-F_Texture2D(tIrradiance1, 3, 0);
-F_Texture2D(tIrradiance2, 4, 0);
-F_Texture2D(tMoments0, 5, 0);
-F_Texture2D(tMoments1, 6, 0);
-F_Texture2D(tMoments2, 7, 0);
-F_StructBuffer(bState, uint, 8, 0);
+F_Texture2D(tIrradiance, 2, 0);
+F_Texture2D(tMoments, 5, 0);
 
 [[vk::image_format("rgba16f")]] [[vk::binding(9, 0)]] RWTexture2D<float4> tOutput;
-F_StructBuffer(bProbeData, float4, 10, 0);
+F_StructBuffer(bProbes, uint4, 10, 0);
 
 F_FrameData(ProbeClipmapDebugConsts, Consts, 1);
 
@@ -40,6 +35,11 @@ F_FrameData(ProbeClipmapDebugConsts, Consts, 1);
 #define VIEW_SPHERES_2 5
 /// Mean visibility of the filled probes around each surface: white sees them all, black none, red has none filled
 #define VIEW_VISIBILITY 6
+/// Level 0 probes: red is the share of their rays that hit back faces (full at CLIPMAP_INACTIVE_BACKFACES), green how
+/// far they were moved (full at the most they can be), blue whether they are switched on
+#define VIEW_BACKFACES 7
+#define VIEW_BACKFACES_1 8
+#define VIEW_BACKFACES_2 9
 
 #define VIEWMODEL_STORED_DEPTH 0.99
 #define SPHERE_RADIUS 0.15
@@ -63,7 +63,7 @@ float3 LevelColour(uint level)
 	return colour;
 }
 
-float3 ShadeSpheres(uint level, float3 eye, float3 direction, float max_distance, float3 background)
+float3 ShadeSpheres(uint level, float3 eye, float3 direction, float max_distance, float3 background, bool backfaces)
 {
 	const ClipmapLevel clip = Consts.Clipmap.Levels[level];
 	const float spacing = clip.vParams.x;
@@ -77,8 +77,8 @@ float3 ShadeSpheres(uint level, float3 eye, float3 direction, float max_distance
 	for (uint index = 0; index < SPHERE_MAX_STEPS; index++) {
 		const float t = float(index) * step;
 		const int3 probe = int3(round((eye + direction * t) * clip.vParams.y));
-		const float4 probe_data = bProbeData[ClipmapProbeDataIndex(level, probe)];
-		const float3 centre = ClipmapProbePosition(clip, probe) + probe_data.xyz;
+		const ClipmapProbe data = ClipmapLoadProbe(level, probe);
+		const float3 centre = ClipmapProbePosition(clip, probe) + data.vOffset;
 
 		const float3 to_centre = centre - eye;
 		const float along = dot(to_centre, direction);
@@ -94,9 +94,14 @@ float3 ShadeSpheres(uint level, float3 eye, float3 direction, float max_distance
 			const float3 normal = normalize(eye + direction * hit_t - centre);
 
 			// Unfilled probes are magenta, switched off ones dark grey
-			colour = select(ClipmapIsValid(level, slot), ClipmapSampleIrradiance(level, slot, normal) * Consts.vParams.x,
+			colour = select(data.bReady, ClipmapSampleIrradiance(level, slot, normal) * Consts.vParams.x,
 							float3(1.0, 0.0, 1.0));
-			colour = select(and(ClipmapIsValid(level, slot), !ClipmapIsActive(probe_data)), float3(0.05, 0.05, 0.05), colour);
+			colour = select(and(data.bValid, !data.bActive), float3(0.05, 0.05, 0.05), colour);
+
+			const float3 state = float3(saturate(data.fBackfaces / CLIPMAP_INACTIVE_BACKFACES),
+										saturate(length(data.vOffset) / (CLIPMAP_MAX_OFFSET * spacing * 1.732)),
+										select(data.bActive, 1.0, 0.0));
+			colour = select(and(backfaces, data.bValid), state * (0.4 + 0.6 * saturate(normal.y * 0.5 + 0.5)), colour);
 			done = true;
 		}
 
@@ -133,8 +138,7 @@ void main(uint3 thread : SV_DispatchThreadID)
 	float3 colour = tOutput[pixel].rgb;
 
 	if (or(or(view == VIEW_SURFACE, view == VIEW_LEVELS), view == VIEW_VISIBILITY)) {
-		const ClipmapGatherResult gather = ClipmapGather(surface, normal, -direction, normal, normal,
-														 ClipmapScreenDither(float2(pixel)));
+		const ClipmapGatherResult gather = ClipmapGather(surface, normal, -direction, normal, normal);
 
 		float3 surface_colour = gather.vDiffuse * Consts.vParams.x;
 		surface_colour = select(view == VIEW_LEVELS, LevelColour(gather.uiLevel) * (0.25 + 0.75 * gather.fValid), surface_colour);
@@ -147,8 +151,11 @@ void main(uint3 thread : SV_DispatchThreadID)
 		uint level = 0;
 		level = select(view == VIEW_SPHERES_1, 1u, level);
 		level = select(view == VIEW_SPHERES_2, 2u, level);
+		level = select(view == VIEW_BACKFACES_1, 1u, level);
+		level = select(view == VIEW_BACKFACES_2, 2u, level);
 
-		colour = ShadeSpheres(level, eye, direction, surface_distance, colour);
+		const bool backfaces = or(view == VIEW_BACKFACES, or(view == VIEW_BACKFACES_1, view == VIEW_BACKFACES_2));
+		colour = ShadeSpheres(level, eye, direction, surface_distance, colour, backfaces);
 	}
 
 	tOutput[pixel] = float4(colour, 1.0);
