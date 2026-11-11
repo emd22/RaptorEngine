@@ -149,12 +149,14 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	const uint job = bJobs[job_index];
 	const uint level_index = ClipmapJobLevel(job);
 	const uint slot = ClipmapJobSlot(job);
-	const uint probe_index = ClipmapProbeIndex(level_index, slot);
-	const uint probe_flags = asuint(bProbeData[probe_index].w);
+	const ClipmapLevel level = Consts.Clipmap.Levels[level_index];
+	const int3 probe = ClipmapSlotProbe(level, slot);
+	const uint probe_index = ClipmapProbeDataIndex(level_index, probe);
+	const float4 probe_data = bProbeData[probe_index];
+	const uint probe_flags = asuint(probe_data.w);
 
 	// New in its slot, or moved far since its tiles were traced
 	const bool reset = or(ClipmapJobIsReset(job), HAS_FLAG(probe_flags, CLIPMAP_PROBE_RESET));
-	const ClipmapLevel level = Consts.Clipmap.Levels[level_index];
 
 	// Irradiance: one texel per thread, the cosine weighted mean radiance (irradiance / pi)
 	const uint2 irradiance_texel = uint2(thread % CLIPMAP_IRRADIANCE_SIZE, thread / CLIPMAP_IRRADIANCE_SIZE);
@@ -260,7 +262,11 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	if (thread == 0) {
 		// Relocation and classification from this update's rays, after DDGI (Majercik et al. 2021)
 		const float spacing = level.vParams.x;
-		const float3 previous_offset = select(ClipmapJobIsReset(job), float3(0.0, 0.0, 0.0), bProbeData[probe_index].xyz);
+		const bool relocate = HAS_FLAG(Consts.vInfo.z, CLIPMAP_FLAG_RELOCATE);
+
+		// Where the trace started from, see ProbeClipmapTrace
+		const float3 stored = select(relocate, ClipmapStoredOffset(probe_data, probe), float3(0.0, 0.0, 0.0));
+		const float3 previous_offset = select(ClipmapJobIsReset(job), stored, probe_data.xyz);
 
 		uint backface_count = 0;
 		float closest_back = 1e30;
@@ -312,13 +318,13 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		}
 
 		const bool fits = all(abs(offset) <= CLIPMAP_MAX_OFFSET * spacing);
-		const bool relocate = HAS_FLAG(Consts.vInfo.z, CLIPMAP_FLAG_RELOCATE);
 		offset = select(relocate, select(fits, offset, previous_offset), float3(0.0, 0.0, 0.0));
 
 		const bool is_active = or(!relocate, backface_ratio <= CLIPMAP_INACTIVE_BACKFACES);
 		const bool moved_far = any(abs(offset - previous_offset) > CLIPMAP_RESET_MOVE * spacing);
 
-		uint flags = select(is_active, CLIPMAP_PROBE_ACTIVE, 0u);
+		uint flags = ClipmapProbeDataKey(probe);
+		flags |= select(is_active, CLIPMAP_PROBE_ACTIVE, 0u);
 		flags |= select(moved_far, CLIPMAP_PROBE_RESET, 0u);
 
 		bProbeData[probe_index] = float4(offset, asfloat(flags));

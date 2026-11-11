@@ -404,6 +404,7 @@ void ProbeClipmap::Reset()
 
 	mTrackedLights.Clear();
 	mbHasTrackedLights = false;
+	mbClearProbeData = true;
 }
 
 void ProbeClipmap::SetProbeMask(const CompiledMapProbeMask& mask)
@@ -878,8 +879,11 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 			level_state[slot] = (level.Valid[slot] == 1) ? scStateValid : 0U;
 			live_count[level_index] += (level.Valid[slot] != 0 && level.Valid[slot] != scDead) ? 1U : 0U;
 
+			// A probe's first trace is all of its history, so it blends its next updates in fast, as if its light
+			// had changed
 			if (level.Valid[slot] == scPending) {
 				level.Valid[slot] = 1;
+				SetDirty(level, slot, scDirtyUpdates);
 			}
 		}
 	}
@@ -959,6 +963,11 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 
 	if (!mbImagesInitialized) {
 		InitializeImages(cmd);
+	}
+
+	if (mbClearProbeData) {
+		vkCmdFillBuffer(cmd.Get(), mProbeData.Buffer, 0, VK_WHOLE_SIZE, 0);
+		mbClearProbeData = false;
 	}
 
 	ComputeBarrier(cmd);

@@ -59,10 +59,15 @@ void main(uint3 group : SV_GroupID, uint ray : SV_GroupIndex)
 	const uint level_index = ClipmapJobLevel(job);
 	const ClipmapLevel level = Consts.Clipmap.Levels[level_index];
 
-	// A probe traced for the first time starts on its grid point
-	const float3 offset = select(ClipmapJobIsReset(job), float3(0.0, 0.0, 0.0),
-								 bProbeData[ClipmapProbeIndex(level_index, ClipmapJobSlot(job))].xyz);
-	const float3 origin = ClipmapProbePosition(level, ClipmapSlotProbe(level, ClipmapJobSlot(job))) + offset;
+	const uint slot = ClipmapJobSlot(job);
+	const int3 probe = ClipmapSlotProbe(level, slot);
+
+	// A probe traced for the first time in its slot starts where it was last moved to, if that is still known
+	const bool relocate = HAS_FLAG(Consts.vInfo.z, CLIPMAP_FLAG_RELOCATE);
+	const float4 probe_data = bProbeData[ClipmapProbeDataIndex(level_index, probe)];
+	const float3 stored = select(relocate, ClipmapStoredOffset(probe_data, probe), float3(0.0, 0.0, 0.0));
+	const float3 offset = select(ClipmapJobIsReset(job), stored, probe_data.xyz);
+	const float3 origin = ClipmapProbePosition(level, probe) + offset;
 	const float3 direction = ClipmapRayDirection(ray, Consts.mRayRotation);
 
 	const float ray_length = level.vParams.z;

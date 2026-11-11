@@ -78,7 +78,7 @@ float3 ShadeSpheres(uint level, float3 eye, float3 direction, float max_distance
 	for (uint index = 0; index < SPHERE_MAX_STEPS; index++) {
 		const float t = float(index) * step;
 		const int3 probe = int3(round((eye + direction * t) * clip.vParams.y));
-		const float4 probe_data = bProbeData[ClipmapProbeIndex(level, ClipmapSlot(probe))];
+		const float4 probe_data = bProbeData[ClipmapProbeDataIndex(level, probe)];
 		const float3 centre = ClipmapProbePosition(clip, probe) + probe_data.xyz;
 
 		const float3 to_centre = centre - eye;

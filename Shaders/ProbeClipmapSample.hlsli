@@ -176,7 +176,7 @@ ClipmapGatherResult ClipmapGatherLevel(Texture2D irradiance, SamplerState irradi
 		const float valid_trilinear = select(is_valid, trilinear, 0.0);
 		valid += valid_trilinear;
 
-		const float4 probe_data = bProbeData[ClipmapProbeIndex(level, slot)];
+		const float4 probe_data = bProbeData[ClipmapProbeDataIndex(level, probe)];
 		const float3 probe_position = ClipmapProbePosition(clip, probe) + probe_data.xyz;
 		const float3 to_receiver = biased - probe_position;
 		const float distance = length(to_receiver);

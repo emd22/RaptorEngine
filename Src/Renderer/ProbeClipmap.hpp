@@ -58,7 +58,13 @@ public:
 
 	/// Sizes of one frame's part of the paged buffers, and of the probe data
 	static constexpr uint64 scStateFrameSize = static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(uint32);
-	static constexpr uint64 scProbeDataSize = static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(float32) * 4;
+	/// The probe data is per grid point, wrapping twice as wide as the window in X and Z. Mirrors
+	/// CLIPMAP_PROBE_DATA_* in Shaders/ProbeClipmapCommon.hlsli
+	static constexpr uint32 scProbeDataX = scGridX * 2;
+	static constexpr uint32 scProbeDataY = scGridY;
+	static constexpr uint32 scProbeDataZ = scGridZ * 2;
+	static constexpr uint64 scProbeDataSize = static_cast<uint64>(scLevelCount) * scProbeDataX * scProbeDataY *
+											  scProbeDataZ * sizeof(float32) * 4;
 	static constexpr uint64 scForwardDataFrameSize = 256;
 
 	enum class eDebugView : uint32
@@ -194,8 +200,10 @@ private:
 	RawGpuBuffer mRays;
 	RawGpuBuffer mState;
 	RawGpuBuffer mStats;
-	/// Offset off the grid point and whether the probe is switched on, written by the blend
+	/// Per grid point: offset off it and whether the probe is switched on, written by the blend
 	RawGpuBuffer mProbeData;
+	/// Set by Reset, so the next update forgets the previous map's offsets
+	bool mbClearProbeData = true;
 	/// What the forward pass needs to read the probes, see ProbeClipmapForwardData
 	RawGpuBuffer mForwardData;
 

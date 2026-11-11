@@ -71,12 +71,47 @@ float3 ClipmapProbePosition(ClipmapLevel level, int3 probe) { return float3(prob
 /// Index of a level's slot in the per probe buffers
 uint ClipmapProbeIndex(uint level, uint slot) { return level * CLIPMAP_PROBES_PER_LEVEL + slot; }
 
-// bProbeData holds a float4 per probe: its offset off its grid point in XYZ, and CLIPMAP_PROBE_* flags in the bits of W
+// bProbeData holds a float4 per grid point: its probe's offset off the grid point in XYZ, and in W the
+// CLIPMAP_PROBE_* flags in the low bits and the grid point's key above them. It is indexed by grid point, wrapping
+// like the window but twice as wide in X and Z, so two live probes never share an entry and a probe that comes back
+// into the window finds where relocation last left it, unless another grid point has used the entry since.
 #define CLIPMAP_PROBE_ACTIVE 0x01
 /// The probe moved far enough that its tiles describe somewhere else, so its next update starts them over
 #define CLIPMAP_PROBE_RESET 0x02
+#define CLIPMAP_PROBE_FLAG_MASK 0x03u
 /// Moves smaller than this much of a spacing keep the probe's history
 #define CLIPMAP_RESET_MOVE 0.1
+
+/// Mirrors ProbeClipmap::scProbeData* in Src/Renderer/ProbeClipmap.hpp
+#define CLIPMAP_PROBE_DATA_X (CLIPMAP_GRID_X * 2)
+#define CLIPMAP_PROBE_DATA_Y CLIPMAP_GRID_Y
+#define CLIPMAP_PROBE_DATA_Z (CLIPMAP_GRID_Z * 2)
+#define CLIPMAP_PROBE_DATA_PER_LEVEL (CLIPMAP_PROBE_DATA_X * CLIPMAP_PROBE_DATA_Y * CLIPMAP_PROBE_DATA_Z)
+
+uint ClipmapProbeDataIndex(uint level, int3 probe)
+{
+	const uint3 wrapped = uint3(probe & int3(CLIPMAP_PROBE_DATA_X - 1, CLIPMAP_PROBE_DATA_Y - 1, CLIPMAP_PROBE_DATA_Z - 1));
+
+	return level * CLIPMAP_PROBE_DATA_PER_LEVEL + wrapped.x + wrapped.y * CLIPMAP_PROBE_DATA_X +
+		   wrapped.z * CLIPMAP_PROBE_DATA_X * CLIPMAP_PROBE_DATA_Y;
+}
+
+/// 10 bits of each coordinate, above the flags. A cleared entry matches the grid point at 0 (mod 1024), and holds no
+/// offset, the same as a miss.
+uint ClipmapProbeDataKey(int3 probe)
+{
+	const uint3 bits = uint3(probe) & 0x3FFu;
+
+	return (bits.x << 2) | (bits.y << 12) | (bits.z << 22);
+}
+
+/// The offset an entry holds for `probe`, or none if another grid point wrote it
+float3 ClipmapStoredOffset(float4 entry, int3 probe)
+{
+	const bool matches = (asuint(entry.w) & ~CLIPMAP_PROBE_FLAG_MASK) == ClipmapProbeDataKey(probe);
+
+	return select(matches, entry.xyz, float3(0.0, 0.0, 0.0));
+}
 
 /// Where slot `slot`'s tile of `tile_size` texels (border included) starts
 uint2 ClipmapTileOrigin(uint slot, uint tile_size)
