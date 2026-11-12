@@ -435,10 +435,21 @@ void TiledForwardRenderer::CreateGIResolvePSO()
 
 	constexpr VkImageUsageFlags scUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-	GIResolvePass.AddTarget(eImageFormat::RGBA16_Float, scUsage, eImageAspectFlag::Color);
+	// The diffuse and the normal are copied into GIHistoryPass after each frame's resolve
+	GIResolvePass.AddTarget(eImageFormat::RGBA16_Float, scUsage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+							eImageAspectFlag::Color);
 	GIResolvePass.AddTarget(eImageFormat::R32_UInt, scUsage, eImageAspectFlag::Color);
-	GIResolvePass.AddTarget(eImageFormat::RG16_Float, scUsage, eImageAspectFlag::Color);
+	GIResolvePass.AddTarget(eImageFormat::RG16_Float, scUsage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+							eImageAspectFlag::Color);
 	GIResolvePass.BuildRenderStage();
+
+	// Last frame's resolve, which this frame's reprojects. Never rendered to, only copied into.
+	GIHistoryPass.Create("GIHistory", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
+	GIHistoryPass.AddTarget(eImageFormat::RGBA16_Float, scUsage | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+							eImageAspectFlag::Color);
+	GIHistoryPass.AddTarget(eImageFormat::RG16_Float, scUsage | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+							eImageAspectFlag::Color);
+	GIHistoryPass.BuildRenderStage();
 
 	ProbeClipmap& clipmap = gGraphics->GIClipmap;
 
@@ -470,6 +481,12 @@ void TiledForwardRenderer::CreateGIResolvePSO()
 	gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, clipmap.GetProbeBuffer(), 0, ProbeClipmap::scProbesSize);
 	gPSOBuild->AddBuffer(5, 0, eShaderType::Pixel, clipmap.GetForwardDataBuffer(), 0,
 						 ProbeClipmap::scForwardDataFrameSize);
+	gPSOBuild->AddImageFromTarget(6, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::RG16_Float), point_sampler);
+	gPSOBuild->AddImageFromTarget(7, 0, eShaderType::Pixel, GIHistoryPass.GetTarget(eImageFormat::RGBA16_Float),
+								  point_sampler);
+	gPSOBuild->AddImageFromTarget(8, 0, eShaderType::Pixel, GIHistoryPass.GetTarget(eImageFormat::RG16_Float),
+								  point_sampler);
+	gPSOBuild->AddBuffer(9, 0, eShaderType::Pixel, clipmap.GetScreenProbeBuffer(), 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddFrameData(1);
 
 	gPSOBuild->EndPipeline();

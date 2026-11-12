@@ -48,6 +48,12 @@ void World::Create()
 	pCVarSDFPageRayLength = gCVars->Set<float32>("r_sdf_page_ray_length", 50.0f);
 	pCVarSDFPageProbeStride = gCVars->Set<int64>("r_sdf_page_probe_stride", 1);
 	pCVarGIClipmapDebug = gCVars->Set<int64>("r_gi_clipmap_debug", 0);
+	pCVarSPRayLength = gCVars->Set<float32>("r_gi_sp_ray_length", 2.0f);
+	pCVarSPCone = gCVars->Set<float32>("r_gi_sp_cone", 0.0f);
+	pCVarSPRepeat = gCVars->Set<int64>("r_gi_sp_repeat", 1);
+	pCVarScreenProbes = gCVars->Set<int64>("r_gi_screen_probes", 1);
+	pCVarGITemporal = gCVars->Set<int64>("r_gi_temporal", 1);
+	pCVarSPAlpha = gCVars->Set<float32>("r_gi_sp_alpha", 0.1f);
 	pCVarGIProbeBudget = gCVars->Set<int64>("r_gi_probe_budget", 3072);
 	pCVarGIHysteresis = gCVars->Set<float32>("r_gi_hysteresis", 0.97f);
 	pCVarGIBounce = gCVars->Set<int64>("r_gi_bounce", 1);
@@ -1296,6 +1302,14 @@ void World::Render(BaseCamera* shadow_camera)
 		if (clipmap_view > 0 && clipmap_view < static_cast<int64>(ProbeClipmap::eDebugView::Count)) {
 			gGraphics->GIClipmapDebugView = static_cast<ProbeClipmap::eDebugView>(clipmap_view);
 		}
+
+		// Screen probes, read by the GI resolve; r_gi_clipmap_debug 11 and 12 show them before reprojection
+		gGraphics->GIClipmap.ScreenProbeRayLength = std::clamp(pCVarSPRayLength->FloatValue, 0.1f, 200.0f);
+		gGraphics->GIClipmap.ScreenProbeCone = std::max(pCVarSPCone->FloatValue, 0.0f);
+		gGraphics->GIClipmap.ScreenProbeRepeat = static_cast<uint32>(std::clamp<int64>(pCVarSPRepeat->IntValue, 1, 64));
+		gGraphics->bGIScreenProbes = (pCVarScreenProbes->IntValue != 0);
+		gGraphics->bGITemporal = (pCVarGITemporal->IntValue != 0);
+		gGraphics->GIScreenProbeAlpha = pCVarSPAlpha->FloatValue;
 	}
 
 	const int64 sdf_page_view = pCVarSDFPageDebug->IntValue;

@@ -19,7 +19,7 @@ static const PipelineNameInfo scNameInfos[] = {
 	NAME_INFO("FogFroxelInject"), NAME_INFO("FogFroxelIntegrate"), NAME_INFO("FogFroxelApply"),
 	NAME_INFO("SDFPageUpdate"), NAME_INFO("SDFPageDebug"),
 	NAME_INFO("ProbeClipmapTrace"), NAME_INFO("ProbeClipmapBlend"), NAME_INFO("ProbeClipmapDebug"),
-	NAME_INFO("ProbeClipmapResolve"),
+	NAME_INFO("ProbeClipmapResolve"), NAME_INFO("ScreenProbeTrace"),
 };
 
 static_assert(std::size(scNameInfos) == static_cast<uint32>(ePipelineName::NumPipelines));

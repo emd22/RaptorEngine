@@ -86,6 +86,12 @@ public:
 	static constexpr float32 scLevelSpacings[scLevelCount] = { 0.5f, 1.0f, 4.0f };
 	/// Mirrors CLIPMAP_MAX_PROXIES in Shaders/ProbeClipmapConsts.hlsli
 	static constexpr uint32 scMaxProxies = 32;
+
+	/// Screen probes: one per tile of this many pixels, at most this many, each this many float4s. Mirror
+	/// Shaders/ScreenProbeCommon.hlsli.
+	static constexpr uint32 scScreenProbeTile = 16;
+	static constexpr uint32 scMaxScreenProbes = 65536;
+	static constexpr uint32 scScreenProbeStride = 5;
 	static constexpr uint32 scMaxJobsPerFrame = 8192;
 
 	/// One uint4 record per slot, written by the blend: the probe it holds, whether it is filled and switched on, its
@@ -105,6 +111,9 @@ public:
 		Backfaces,
 		Backfaces1,
 		Backfaces2,
+		Weight,
+		ScreenProbes,
+		ScreenProbeCoverage,
 		Count,
 	};
 
@@ -168,12 +177,25 @@ public:
 	/// Overwrites the lit target with a view of the probes
 	void RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebugView view);
 
+	/**
+	 * Places a probe on the surface of each screen tile and traces it, for the GI resolve to read. Needs this frame's
+	 * prepass and the update's trace constants.
+	 */
+	void TraceScreenProbes(CommandBuffer& cmd, const BaseCamera& camera, UVec2 extent);
+
 	bool IsReady() const { return mbImagesInitialized; }
+
+	/// Screen probe settings: metres traced through the SDF pages before the clipmap is read, the cone slope, and how
+	/// many times the trace is dispatched (for timing)
+	float32 ScreenProbeRayLength = 2.0f;
+	float32 ScreenProbeCone = 0.0f;
+	uint32 ScreenProbeRepeat = 1;
 
 	Image* GetIrradianceImage() { return mpIrradiance; }
 	Image* GetMomentsImage() { return mpMoments; }
 	RawGpuBuffer* GetProbeBuffer() { return &mProbes; }
 	RawGpuBuffer* GetForwardDataBuffer() { return &mForwardData; }
+	RawGpuBuffer* GetScreenProbeBuffer() { return &mScreenProbes; }
 
 	uint32 GetForwardDataFrameOffset(uint32 frame) const { return static_cast<uint32>(frame * scForwardDataFrameSize); }
 
@@ -238,6 +260,8 @@ private:
 	FVec3 mCenter = FVec3::sZero;
 	/// What the forward pass needs to read the probes, see ProbeClipmapForwardData
 	RawGpuBuffer mForwardData;
+	/// Screen probes, see scScreenProbeStride
+	RawGpuBuffer mScreenProbes;
 
 	CompiledMapProbeMask mMask;
 	/// The mask level each level reads, the one built for its spacing, or -1 where the map has none

@@ -24,6 +24,11 @@
 /// A cell whose filled probes have less than this much of the trilinear weight is read from the next coarser level
 #define CLIPMAP_MIN_VALID 1e-3
 
+/// A level whose probe weights around a receiver sum to less than this (before normalizing) only keeps that share of it,
+/// and hands the rest to the next coarser level. Normalized, a few nearly zero weights (a crease, a probe or two that
+/// barely see the surface) give whatever the least hidden probe holds: black slivers, bright glows.
+#define CLIPMAP_CONFIDENT_WEIGHT 0.02
+
 /// Probes behind the receiver's surface get this little of their weight
 #define CLIPMAP_BEHIND_WEIGHT 1e-3
 
@@ -38,6 +43,9 @@ struct ClipmapGatherResult
 	float fValid;
 	/// Mean visibility weight of the filled probes, 1 where nothing occludes them
 	float fVisibility;
+	/// Sum of the probe weights before they are normalized. Near 1 where the probes around the surface face it and see
+	/// it, near 0 where the gather has almost nothing to go on.
+	float fWeight;
 };
 
 float3 ClipmapSampleIrradiance(uint level, uint slot, float3 direction)
@@ -191,6 +199,7 @@ ClipmapGatherResult ClipmapGatherLevel(uint level, float3 position, float3 bias,
 	result.uiLevel = level;
 	result.fValid = valid;
 	result.fVisibility = visibility_sum / max(valid, 1e-6);
+	result.fWeight = total;
 
 	return result;
 }
@@ -210,10 +219,12 @@ ClipmapGatherResult ClipmapGatherAt(float3 position, float3 geometric_normal, fl
 	result.uiLevel = CLIPMAP_LEVELS;
 	result.fValid = 0.0;
 	result.fVisibility = 0.0;
+	result.fWeight = 0.0;
 
-	// The first level with filled probes keeps all but the coarser share near its window's edge, and the next one
-	// with filled probes takes what is left. A cell with none filled (all in walls or outside the map, or not traced
-	// yet) has nothing to give, so it is passed over. Most pixels read one level, the ones in a band two.
+	// The first level with filled probes keeps all but the coarser share near its window's edge (and less where its
+	// probes hardly see the surface), and the next one with filled probes takes what is left. A cell with none filled
+	// (all in walls or outside the map, or not traced yet) has nothing to give, so it is passed over. Most pixels read
+	// one level, the ones in a band or a crease two or three.
 	float taken = 0.0;
 	float keep = 1.0 - coarser_share;
 
@@ -223,12 +234,16 @@ ClipmapGatherResult ClipmapGatherAt(float3 position, float3 geometric_normal, fl
 															  reflected, with_specular);
 
 		const bool usable = gather.fValid > CLIPMAP_MIN_VALID;
-		const float share = select(usable, select(level + 1 < CLIPMAP_LEVELS, keep, 1.0) * (1.0 - taken), 0.0);
+		// The coarsest level is held to its confidence too, so where every level is unsure they are mixed by how sure
+		// each one is. The floor keeps a usable level from giving nothing at all.
+		const float confidence = max(saturate(gather.fWeight / CLIPMAP_CONFIDENT_WEIGHT), 1e-3);
+		const float share = select(usable, select(level + 1 < CLIPMAP_LEVELS, keep, 1.0) * confidence * (1.0 - taken), 0.0);
 
 		result.vDiffuse += gather.vDiffuse * share;
 		result.vSpecular += gather.vSpecular * share;
 		result.fValid += gather.fValid * share;
 		result.fVisibility += gather.fVisibility * share;
+		result.fWeight += gather.fWeight * share;
 		result.uiLevel = select(and(usable, result.uiLevel == CLIPMAP_LEVELS), level, result.uiLevel);
 
 		taken += share;
@@ -244,6 +259,7 @@ ClipmapGatherResult ClipmapGatherAt(float3 position, float3 geometric_normal, fl
 	result.vDiffuse *= inv_taken;
 	result.vSpecular *= inv_taken;
 	result.fValid *= inv_taken;
+	result.fWeight *= inv_taken;
 	result.fVisibility = select(taken > 0.0, result.fVisibility * inv_taken, 1.0);
 	result.uiLevel = select(found, result.uiLevel, CLIPMAP_LEVELS);
 

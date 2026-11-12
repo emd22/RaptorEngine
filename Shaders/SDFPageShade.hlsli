@@ -23,8 +23,7 @@ SDFPageTriangle SDFPageNearestTriangle(SDFPageHit hit, float3 position)
 /// Unit face normal of the triangle, turned to face against `direction`
 float3 SDFPageHitNormal(SDFPageTriangle page_triangle, float3 direction)
 {
-	const float3 face = normalize(cross(page_triangle.vB.xyz - page_triangle.vA.xyz,
-										page_triangle.vC.xyz - page_triangle.vA.xyz));
+	const float3 face = SDFPageTriangleFace(page_triangle, -direction);
 
 	return select(dot(face, direction) > 0.0, -face, face);
 }

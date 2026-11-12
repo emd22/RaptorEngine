@@ -9,6 +9,13 @@
 #define CLIPMAP_PROBES_PER_LEVEL (CLIPMAP_GRID_X * CLIPMAP_GRID_Y * CLIPMAP_GRID_Z)
 #define CLIPMAP_RAYS 64
 
+/// False for NaN and infinities. The GI passes keep them out: one kept in a probe or a history texel reaches everything
+/// that reads it, for good.
+bool GIIsFinite(float3 value)
+{
+	return and(!any(isnan(value)), !any(isinf(value)));
+}
+
 /// Irradiance is 8x8 per probe and depth moments 16x16, on every level. Each tile has a one texel border holding the
 /// texels across the octahedral seams.
 #define CLIPMAP_IRRADIANCE_SIZE 8

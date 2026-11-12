@@ -230,6 +230,8 @@ public:
 
 	/// The GI probes gathered at half resolution: diffuse + eye distance, packed specular, normal
 	RenderStage GIResolvePass;
+	/// Last frame's GIResolvePass diffuse and normal, see GraphicsBackend::RenderGIResolve
+	RenderStage GIHistoryPass;
 
 	/* Volumetric Lighting */
 	RenderStage FogApplyPass;

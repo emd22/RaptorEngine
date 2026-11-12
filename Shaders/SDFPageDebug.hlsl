@@ -200,7 +200,7 @@ float3 ShadePixel(uint2 pixel, uint2 group, uint2 local)
 				if (hit.bHit) {
 					const float3 position = origin + direction * hit.fDistance;
 					const SDFPageTriangle page_triangle = SDFPageNearestTriangle(hit, position);
-					const float3 face = normalize(cross(page_triangle.vB.xyz - page_triangle.vA.xyz, page_triangle.vC.xyz - page_triangle.vA.xyz));
+					const float3 face = SDFPageTriangleFace(page_triangle, float3(0.0, 1.0, 0.0));
 					const float3 hit_normal = select(dot(face, direction) > 0.0, -face, face);
 
 					const float angle = float(Hash(seed ^ 0x68E31DA4u) & 0xFFFFu) * (2.0 * PI / 65536.0);

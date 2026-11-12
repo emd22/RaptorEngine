@@ -10,7 +10,7 @@ struct ProbeClipmapDebugConsts
 	float4 vEyePosition;
 	/// Target width and height, view
 	uint4 vInfo;
-	/// Pre-exposure
+	/// Pre-exposure, screen probe tile size
 	float4 vParams;
 };
 
@@ -21,11 +21,15 @@ F_Texture2D(tMoments, 5, 0);
 
 [[vk::image_format("rgba16f")]] [[vk::binding(9, 0)]] RWTexture2D<float4> tOutput;
 F_StructBuffer(bProbes, uint4, 10, 0);
+/// This frame's screen probes, see ScreenProbeTrace.hlsl
+F_StructBuffer(bScreenProbes, float4, 11, 0);
 
 F_FrameData(ProbeClipmapDebugConsts, Consts, 1);
 
 #define CLIPMAP_SCENE Consts.Clipmap
 #include "ProbeClipmapSample.hlsli"
+#include "ProbeClipmapResolve.hlsli"
+#include "ScreenProbeSample.hlsli"
 
 /// Mirrors ProbeClipmap::eDebugView
 #define VIEW_SPHERES_0 1
@@ -40,6 +44,15 @@ F_FrameData(ProbeClipmapDebugConsts, Consts, 1);
 #define VIEW_BACKFACES 7
 #define VIEW_BACKFACES_1 8
 #define VIEW_BACKFACES_2 9
+/// Sum of the gather's probe weights before normalizing: green 1, yellow 0.03, red 1e-3, magenta under 1e-4, blue where
+/// no level holds the surface
+#define VIEW_WEIGHT 10
+/// Screen probes: irradiance / pi from this frame's screen probes around each pixel (no reprojection), the clipmap where
+/// none stand for it; and which of the two each pixel took (green screen probes, red the clipmap). Needs
+/// r_gi_screen_probes.
+#define VIEW_SCREEN_PROBES 11
+#define VIEW_SCREEN_PROBE_COVERAGE 12
+
 
 #define VIEWMODEL_STORED_DEPTH 0.99
 #define SPHERE_RADIUS 0.15
@@ -51,6 +64,14 @@ float3 WorldFromDepth(float2 uv, float stored_depth)
 	const float4 world = mul(ndc, Consts.mInvViewProjection);
 
 	return world.xyz / world.w;
+}
+
+float3 DebugWorldPosition(int2 unclamped)
+{
+	const int2 pixel = clamp(unclamped, int2(0, 0), int2(Consts.vInfo.xy) - 1);
+	const float2 uv = (float2(pixel) + 0.5) / float2(Consts.vInfo.xy);
+
+	return WorldFromDepth(uv, F_SampleLoad(tDepth, int3(pixel, 0)).r);
 }
 
 float3 LevelColour(uint level)
@@ -137,13 +158,39 @@ void main(uint3 thread : SV_DispatchThreadID)
 
 	float3 colour = tOutput[pixel].rgb;
 
-	if (or(or(view == VIEW_SURFACE, view == VIEW_LEVELS), view == VIEW_VISIBILITY)) {
-		const ClipmapGatherResult gather = ClipmapGather(surface, normal, -direction, normal, normal);
+	const bool is_screen_view = or(view == VIEW_SCREEN_PROBES, view == VIEW_SCREEN_PROBE_COVERAGE);
+
+	if (or(or(or(or(view == VIEW_SURFACE, view == VIEW_LEVELS), view == VIEW_VISIBILITY), view == VIEW_WEIGHT),
+		   is_screen_view)) {
+		const int2 at = int2(pixel);
+		const float3 geometric_normal =
+			GI_RESOLVE_GEOMETRIC_NORMAL(DebugWorldPosition, surface, at, -direction, surface_distance * 0.05, normal);
+
+		const ClipmapGatherResult gather = ClipmapGather(surface, geometric_normal, -direction, normal, normal);
 
 		float3 surface_colour = gather.vDiffuse * Consts.vParams.x;
 		surface_colour = select(view == VIEW_LEVELS, LevelColour(gather.uiLevel) * (0.25 + 0.75 * gather.fValid), surface_colour);
 		surface_colour = select(view == VIEW_VISIBILITY,
 								select(gather.fValid > 1e-3, gather.fVisibility.xxx, float3(1.0, 0.0, 0.0)), surface_colour);
+
+		const float stops = saturate(-log2(max(gather.fWeight, 1e-6)) * (0.30103 / 3.0));
+		float3 weight_colour = select(stops < 0.5, float3(stops * 2.0, 1.0, 0.0), float3(1.0, 2.0 - stops * 2.0, 0.0));
+		weight_colour = select(gather.fWeight < 1e-4, float3(1.0, 0.0, 1.0), weight_colour);
+		weight_colour = select(gather.uiLevel < CLIPMAP_LEVELS, weight_colour, float3(0.0, 0.0, 1.0));
+		surface_colour = select(view == VIEW_WEIGHT, weight_colour * (0.4 + 0.6 * saturate(dot(normal, -direction))),
+								surface_colour);
+
+		if (is_screen_view) {
+			float screen_weight;
+			const float3 screen = ScreenProbeGather(surface, surface_distance, geometric_normal, normal, pixel,
+													Consts.vInfo.xy, uint(Consts.vParams.y), screen_weight);
+			const float share = ScreenProbeShare(screen_weight);
+			const float3 screen_colour = lerp(gather.vDiffuse, screen, share);
+
+			surface_colour = select(view == VIEW_SCREEN_PROBES, screen_colour * Consts.vParams.x,
+									lerp(float3(0.9, 0.2, 0.2), float3(0.2, 0.9, 0.2), share) *
+										(0.4 + 0.6 * saturate(dot(normal, -direction))));
+		}
 
 		colour = select(has_surface, surface_colour, colour);
 	}

@@ -334,6 +334,12 @@ public:
 	ProbeClipmap GIClipmap;
 	ProbeClipmap::eDebugView GIClipmapDebugView = ProbeClipmap::eDebugView::None;
 
+	/// Phase 2 GI: screen probes in the GI resolve, and the resolve's temporal reprojection with the share of each
+	/// frame's light that goes into the history
+	bool bGIScreenProbes = true;
+	bool bGITemporal = true;
+	float32 GIScreenProbeAlpha = 0.1f;
+
 	/// Filled by the world as it writes the light buffer each frame
 	SizedArray<ShadeLightCandidate> ShadeLights;
 
@@ -375,6 +381,10 @@ private:
 	Ref<Window> mpWindow = nullptr;
 
 	SizedArray<Semaphore> mSubmitSemaphores;
+
+	/// The GI resolve's history: whether GIHistoryPass holds last frame's resolve, and where the eye was for it
+	bool mbGIHistoryValid = false;
+	FVec3 mGIPrevEye = FVec3::sZero;
 
 	uint32 mImageIndex = 0;
 

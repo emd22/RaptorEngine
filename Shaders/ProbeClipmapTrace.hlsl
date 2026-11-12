@@ -81,8 +81,7 @@ void main(uint3 group : SV_GroupID, uint ray : SV_GroupIndex)
 	if (hit.bHit) {
 		const SDFPageTriangle page_triangle = SDFPageNearestTriangle(hit, origin + direction * hit.fDistance);
 
-		page_face = normalize(cross(page_triangle.vB.xyz - page_triangle.vA.xyz,
-									page_triangle.vC.xyz - page_triangle.vA.xyz));
+		page_face = SDFPageTriangleFace(page_triangle, -direction);
 		page_albedo = SDFPageTriangleAlbedo(page_triangle);
 
 		const float texel = Consts.SDFPages.Levels[hit.uiLevel].vParams.w;
@@ -150,6 +149,10 @@ void main(uint3 group : SV_GroupID, uint ray : SV_GroupIndex)
 		// moved off the wall, leaving a black probe on every grid aligned surface.
 		distance = select(is_backface, -max(recorded, 1e-5), recorded);
 	}
+
+	// A NaN or infinity kept in a probe would reach every probe and pixel that reads it, for good
+	radiance = select(GIIsFinite(radiance), radiance, float3(0.0, 0.0, 0.0));
+	distance = select(GIIsFinite(distance.xxx), distance, ray_length);
 
 	bRays[job_index * CLIPMAP_RAYS + ray] = float4(radiance, distance);
 }

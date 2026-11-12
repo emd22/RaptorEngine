@@ -43,6 +43,7 @@ enum class ePipelineName : uint16
 	ProbeClipmapBlend,
 	ProbeClipmapDebug,
 	ProbeClipmapResolve,
+	ScreenProbeTrace,
 
 	NumPipelines
 };

@@ -31,6 +31,8 @@ enum class eGpuMarker : uint32
 	GITrace,
 	GIClipmap,
 	GIClipmapDebug,
+	/// Screen probe rays, traced before the GI resolve
+	ScreenProbeTrace,
 	Composition,
 
 	Count,

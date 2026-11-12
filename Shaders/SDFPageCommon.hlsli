@@ -29,6 +29,18 @@ struct SDFPageTriangle
 	float4 vC;
 };
 
+/**
+ * Unit face normal of the triangle, or `fallback` for one with (next to) no area. A sliver from a curve patch or a
+ * merged face would otherwise normalize a zero vector into NaN, which a GI history never washes back out.
+ */
+float3 SDFPageTriangleFace(SDFPageTriangle page_triangle, float3 fallback)
+{
+	const float3 normal = cross(page_triangle.vB.xyz - page_triangle.vA.xyz, page_triangle.vC.xyz - page_triangle.vA.xyz);
+	const float len = length(normal);
+
+	return select(len > 1e-10, normal / max(len, 1e-30), fallback);
+}
+
 float3 SDFPageTriangleAlbedo(SDFPageTriangle page_triangle)
 {
 	const uint packed = asuint(page_triangle.vA.w);

@@ -111,6 +111,24 @@ static_assert(sizeof(ProbeClipmapConsts) ==
 			  192 + 144 + 80 + 4 * SDFPageScene::scShadeMaxLights + 16 * 5 + 64 * ProbeClipmap::scMaxProxies);
 static_assert(sizeof(ProbeClipmapDebugConsts) == 144 + 64 + 16 * 3);
 
+/// Mirrors ScreenProbeTraceConsts in Shaders/ScreenProbeTrace.hlsl
+struct ScreenProbeTraceConsts
+{
+	ProbeClipmapConsts Base;
+	float32 InvViewProjection[16] = {};
+	float32 EyePosition[4] = {};
+	/// Width, height, tile size, tiles across
+	uint32 Screen[4] = {};
+	/// Ray length, cone slope, frame (as bits)
+	float32 Params[4] = {};
+};
+
+static_assert(sizeof(ScreenProbeTraceConsts) <= FrameAllocator::scMaxAllocationSize);
+
+/// The last update's trace constants, which the screen probes trace with
+static ProbeClipmapConsts sScreenProbeBase;
+static bool sbHasScreenProbeBase = false;
+
 /// Mirrors SHADE_FLAG_BAKED_SUN in Shaders/SDFPageShade.hlsli
 constexpr uint32 scShadeFlagBakedSun = 0x01;
 
@@ -234,6 +252,10 @@ void ProbeClipmap::Create()
 	mForwardData.Create(eGpuBufferType::Storage, scForwardDataFrameSize * FramesInFlight, VMA_MEMORY_USAGE_CPU_TO_GPU,
 						eGpuBufferFlags::PersistentMapped);
 
+	mScreenProbes.Create(eGpuBufferType::Storage,
+						 static_cast<uint64>(scMaxScreenProbes) * scScreenProbeStride * sizeof(float32) * 4,
+						 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::None);
+
 	Reset();
 }
 
@@ -243,6 +265,7 @@ void ProbeClipmap::Destroy()
 	mRays.Destroy();
 	mProbes.Destroy();
 	mForwardData.Destroy();
+	mScreenProbes.Destroy();
 }
 
 void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
@@ -325,6 +348,47 @@ void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
 	gPSOBuild->AddImage(5, 0, eShaderType::Compute, mpMoments, linear_sampler);
 	gPSOBuild->AddStorageImage(9, 0, eShaderType::Compute, &lit->GetImage());
 	gPSOBuild->AddBuffer(10, 0, eShaderType::Compute, &mProbes, 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddBuffer(11, 0, eShaderType::Compute, &mScreenProbes, 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddFrameData(1);
+	gPSOBuild->EndPipeline();
+
+	// Screen probes: the trace's bindings, the prepass and the probe output
+	gPSOBuild->BeginPipeline(ePipelineName::ScreenProbeTrace);
+	gPSOBuild->SetShader(eShaderName::ScreenProbeTrace, {});
+	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, pages.GetIndirectionBuffer(), 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddImage(1, 0, eShaderType::Compute, pages.GetAtlas(), linear_sampler);
+	gPSOBuild->AddBuffer(2, 0, eShaderType::Compute, pages.GetTriangleBuffer(), 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddBuffer(3, 0, eShaderType::Compute, pages.GetRefBuffer(), 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddBuffer(4, 0, eShaderType::Compute, pages.GetAtlasFirstRefBuffer(), 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddImage(5, 0, eShaderType::Compute, pages.GetNearest(), point_sampler);
+	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+						 gGraphics->LightBuffer.PageSize);
+	gPSOBuild->AddImageFromTarget(7, 0, eShaderType::Compute, gShadowAtlas->GetTarget(),
+								  gSamplerCache->Request({
+									  eSamplerFilter::Linear,
+									  eSamplerFilter::Linear,
+									  eSamplerFilter::Linear,
+									  eSamplerAddressMode::ClampToBorder,
+									  eSamplerBorderColor::FloatWhite,
+									  eSamplerCompareOp::Greater,
+								  }));
+	gPSOBuild->AddImage(8, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas,
+						gSamplerCache->Request({
+							eSamplerFilter::Linear,
+							eSamplerFilter::Linear,
+							eSamplerFilter::Nearest,
+							eSamplerAddressMode::ClampToEdge,
+							eSamplerBorderColor::FloatWhite,
+							eSamplerCompareOp::LessOrEqual,
+						}));
+	gPSOBuild->AddBuffer(9, 0, eShaderType::Compute, &gGraphics->FogShadowPageBuffer, 0,
+						 gGraphics->FogShadowPageBufferSize);
+	gPSOBuild->AddImage(12, 0, eShaderType::Compute, mpIrradiance, linear_sampler);
+	gPSOBuild->AddImage(15, 0, eShaderType::Compute, mpMoments, linear_sampler);
+	gPSOBuild->AddBuffer(19, 0, eShaderType::Compute, &mProbes, 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddImageFromTarget(20, 0, eShaderType::Compute, depth, point_sampler);
+	gPSOBuild->AddImageFromTarget(21, 0, eShaderType::Compute, normals, point_sampler);
+	gPSOBuild->AddBuffer(22, 0, eShaderType::Compute, &mScreenProbes, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
 }
@@ -1017,6 +1081,9 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 
 	const uint32 consts_offset = gGraphics->FrameAlloc.Push(consts);
 
+	sScreenProbeBase = consts;
+	sbHasScreenProbeBase = true;
+
 	const uint32 columns = std::min(job_count, scJobColumns);
 	const uint32 rows = (job_count + scJobColumns - 1) / scJobColumns;
 
@@ -1096,6 +1163,60 @@ void ProbeClipmap::InitializeImages(CommandBuffer& cmd)
 	mbImagesInitialized = true;
 }
 
+void ProbeClipmap::TraceScreenProbes(CommandBuffer& cmd, const BaseCamera& camera, UVec2 extent)
+{
+	if (!mbImagesInitialized || !sbHasScreenProbeBase) {
+		return;
+	}
+
+	const FMat4 inverse = camera.GetCameraMatrix(eObjectLayer::WorldLayer).Inverse();
+	const FVec3 eye = camera.GetPosition();
+
+	ScreenProbeTraceConsts trace;
+	trace.Base = sScreenProbeBase;
+	trace.Base.Info[1] = gGraphics->GetElapsedFrameCount();
+	trace.Base.Info[2] |= scFlagBounce;
+	memcpy(trace.InvViewProjection, inverse.RawData, sizeof(FMat4));
+	trace.EyePosition[0] = eye.X;
+	trace.EyePosition[1] = eye.Y;
+	trace.EyePosition[2] = eye.Z;
+	trace.EyePosition[3] = 1.0f;
+
+	const uint32 tiles_x = (extent.X + scScreenProbeTile - 1) / scScreenProbeTile;
+	const uint32 tiles_y = std::min((extent.Y + scScreenProbeTile - 1) / scScreenProbeTile,
+									scMaxScreenProbes / std::max(tiles_x, 1U));
+
+	trace.Screen[0] = extent.X;
+	trace.Screen[1] = extent.Y;
+	trace.Screen[2] = scScreenProbeTile;
+	trace.Screen[3] = tiles_x;
+	trace.Params[0] = ScreenProbeRayLength;
+	trace.Params[1] = ScreenProbeCone;
+
+	const uint32 frame_bits = gGraphics->GetElapsedFrameCount();
+	memcpy(&trace.Params[2], &frame_bits, sizeof(frame_bits));
+
+	ComputeBarrier(cmd);
+
+	for (uint32 repeat = 0; repeat < std::max(ScreenProbeRepeat, 1U); repeat++) {
+		// Every buffer binding is dynamic, each takes an offset in binding order
+		gPipelineCache->AddBufferOffset(0, 0);
+		gPipelineCache->AddBufferOffset(0, 0);
+		gPipelineCache->AddBufferOffset(0, 0);
+		gPipelineCache->AddBufferOffset(0, 0);
+		gPipelineCache->AddBufferOffset(0, gGraphics->LightBuffer.GetBaseOffset());
+		gPipelineCache->AddBufferOffset(0, 0);
+		gPipelineCache->AddBufferOffset(0, 0);
+		gPipelineCache->AddBufferOffset(0, 0);
+		gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(trace));
+		gPipelineCache->Bind(ePipelineName::ScreenProbeTrace, cmd);
+
+		vkCmdDispatch(cmd.Get(), tiles_x, tiles_y, 1);
+	}
+
+	BarrierHelper::BufferComputeToFragment(cmd, &mScreenProbes);
+}
+
 void ProbeClipmap::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebugView view)
 {
 	if (!mbImagesInitialized || view == eDebugView::None) {
@@ -1123,6 +1244,8 @@ void ProbeClipmap::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 	consts.Info[1] = extent.Y;
 	consts.Info[2] = static_cast<uint32>(view);
 	consts.Params[0] = gGraphics->PreExposure;
+	consts.Params[1] = static_cast<float32>(scScreenProbeTile);
+
 
 	Image* lit = &gGraphics->pRenderer->ForwardPass.GetTarget(eImageFormat::RGBA16_Float)->GetImage();
 
@@ -1131,6 +1254,7 @@ void ProbeClipmap::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 	// The spheres are drawn over what the lit target holds, so its contents are kept
 	ImageBarrier(cmd, lit, lit->ImageLayout, VK_IMAGE_LAYOUT_GENERAL);
 
+	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, 0);
 
 	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));

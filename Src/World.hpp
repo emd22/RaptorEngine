@@ -229,6 +229,13 @@ public:
 	CVarValue* pCVarSDFPageRayLength = nullptr;
 	CVarValue* pCVarSDFPageProbeStride = nullptr;
 	CVarValue* pCVarGIClipmapDebug = nullptr;
+	/// Screen probes and the GI resolve's temporal reprojection
+	CVarValue* pCVarSPRayLength = nullptr;
+	CVarValue* pCVarSPCone = nullptr;
+	CVarValue* pCVarSPRepeat = nullptr;
+	CVarValue* pCVarScreenProbes = nullptr;
+	CVarValue* pCVarGITemporal = nullptr;
+	CVarValue* pCVarSPAlpha = nullptr;
 	CVarValue* pCVarGIProbeBudget = nullptr;
 	CVarValue* pCVarGIHysteresis = nullptr;
 	CVarValue* pCVarGIBounce = nullptr;
