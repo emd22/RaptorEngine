@@ -30,20 +30,39 @@ struct SDFPageTriangle
 };
 
 /**
- * Unit face normal of the triangle, or `fallback` for one with (next to) no area. A sliver from a curve patch or a
- * merged face would otherwise normalize a zero vector into NaN, which a GI history never washes back out.
+ * What a ray's hit needs of the triangle it stopped at, a third of the triangle's size, made from it at map load.
+ * Mirrors SDFPageHitRecordGpu in Src/Renderer/SDFPageScene.hpp.
  */
-float3 SDFPageTriangleFace(SDFPageTriangle page_triangle, float3 fallback)
+struct SDFPageHitRecord
 {
-	const float3 normal = cross(page_triangle.vB.xyz - page_triangle.vA.xyz, page_triangle.vC.xyz - page_triangle.vA.xyz);
-	const float len = length(normal);
+	/// Unit face normal, octahedral (Z at the centre), as two 16 bit snorms
+	uint uiNormal;
+	/// dot(normal, the triangle's corners)
+	float fPlane;
+	/// Linear albedo as RGB8, red in the low byte, and SDF_PAGE_RECORD_HAS_FACE
+	uint uiAlbedo;
+	uint uiPadding;
+};
 
-	return select(len > 1e-10, normal / max(len, 1e-30), fallback);
+/// Set where the triangle has a face normal. A sliver from a curve patch or a merged face has (next to) no area, and
+/// its normal would be a normalized zero vector, NaN, which a GI history never washes back out.
+#define SDF_PAGE_RECORD_HAS_FACE 0x01000000u
+
+/// Unit face normal of the record's triangle, or `fallback` for one without
+float3 SDFPageRecordFace(SDFPageHitRecord record, float3 fallback)
+{
+	const float2 e = float2(int2(int(record.uiNormal << 16) >> 16, int(record.uiNormal) >> 16)) * (1.0 / 32767.0);
+	const float z = 1.0 - abs(e.x) - abs(e.y);
+	const float2 signs = select(e >= 0.0, float2(1.0, 1.0), float2(-1.0, -1.0));
+	const float2 xy = select(z >= 0.0, e, (1.0 - abs(e.yx)) * signs);
+	const bool has_face = (record.uiAlbedo & SDF_PAGE_RECORD_HAS_FACE) != 0u;
+
+	return select(has_face, normalize(float3(xy, z)), fallback);
 }
 
-float3 SDFPageTriangleAlbedo(SDFPageTriangle page_triangle)
+float3 SDFPageRecordAlbedo(SDFPageHitRecord record)
 {
-	const uint packed = asuint(page_triangle.vA.w);
+	const uint packed = record.uiAlbedo;
 
 	return float3(packed & 0xFFu, (packed >> 8) & 0xFFu, (packed >> 16) & 0xFFu) * (1.0 / 255.0);
 }

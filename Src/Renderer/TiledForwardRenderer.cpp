@@ -212,158 +212,166 @@ void TiledForwardRenderer::CreateSSAOBlurPass()
 
 void TiledForwardRenderer::BuildPersistentDescriptor()
 {
-	SizedArray<DescriptorEntry> ds_entries(40);
+	// One per GI resolve stage, which differ only in those images
+	for (uint32 index = 0; index < 2; index++) {
+		RenderStage& resolve = GIResolvePasses[index];
 
-	ds_entries.Insert(DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-												ObjectManager::scBoundSize));
+		SizedArray<DescriptorEntry> ds_entries(40);
 
-	ds_entries.Insert(DescriptorEntry::AsBuffer(1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-												gMaterialManager->MaterialPropertiesBuffer.Size));
+		ds_entries.Insert(DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+													ObjectManager::scBoundSize));
 
+		ds_entries.Insert(DescriptorEntry::AsBuffer(1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer,
+													0, gMaterialManager->MaterialPropertiesBuffer.Size));
 
-	std::pair<DescriptorID, DescriptorSet*> result = gDescriptorCache->Request(ds_entries);
-	pPersistentDescriptorSlim = result.second;
+		// The slim set is the same for both
+		if (index == 0) {
+			pPersistentDescriptorSlim = gDescriptorCache->Request(ds_entries).second;
+		}
 
-	// Add the other descriptors for the non-slim
+		// Add the other descriptors for the non-slim
 
-	ds_entries.Insert(
-		DescriptorEntry::AsBuffer(2, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize));
+		ds_entries.Insert(
+			DescriptorEntry::AsBuffer(2, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize));
 
-	ds_entries.Insert(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
-												gGraphics->LightIndexListPageSize));
+		ds_entries.Insert(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
+													gGraphics->LightIndexListPageSize));
 
-	ds_entries.Insert(DescriptorEntry::AsBuffer(14, eShaderType::Pixel, &gGraphics->ReflectionProbeBuffer, 0,
-												gGraphics->ReflectionProbePageSize));
+		ds_entries.Insert(DescriptorEntry::AsBuffer(14, eShaderType::Pixel, &gGraphics->ReflectionProbeBuffer, 0,
+													gGraphics->ReflectionProbePageSize));
 
-	ds_entries.Insert(DescriptorEntry::AsImage(15, eShaderType::Pixel, gGraphics->pReflectionProbes,
-											   gSamplerCache->Request({
-												   .AddressMode = eSamplerAddressMode::ClampToEdge,
-												   .MaxLOD = static_cast<float32>(Limits::ReflectionProbeMips - 1),
-											   })));
+		ds_entries.Insert(DescriptorEntry::AsImage(15, eShaderType::Pixel, gGraphics->pReflectionProbes,
+												   gSamplerCache->Request({
+													   .AddressMode = eSamplerAddressMode::ClampToEdge,
+													   .MaxLOD = static_cast<float32>(Limits::ReflectionProbeMips - 1),
+												   })));
 
-	ds_entries.Insert(DescriptorEntry::AsImage(16, eShaderType::Pixel, gGraphics->pDfgLut,
-											   gSamplerCache->Request({
-												   .AddressMode = eSamplerAddressMode::ClampToEdge,
-											   })));
+		ds_entries.Insert(DescriptorEntry::AsImage(16, eShaderType::Pixel, gGraphics->pDfgLut,
+												   gSamplerCache->Request({
+													   .AddressMode = eSamplerAddressMode::ClampToEdge,
+												   })));
 
-	ds_entries.Insert(DescriptorEntry::AsImage(17, eShaderType::Pixel, gGraphics->pLightmap,
-											   gSamplerCache->Request({
-												   eSamplerFilter::Linear,
-												   eSamplerFilter::Linear,
-												   eSamplerFilter::Linear,
-												   eSamplerAddressMode::ClampToEdge,
-											   })));
+		ds_entries.Insert(DescriptorEntry::AsImage(17, eShaderType::Pixel, gGraphics->pLightmap,
+												   gSamplerCache->Request({
+													   eSamplerFilter::Linear,
+													   eSamplerFilter::Linear,
+													   eSamplerFilter::Linear,
+													   eSamplerAddressMode::ClampToEdge,
+												   })));
 
-	Target* shadow_target = gShadowAtlas->GetTarget();
-	Assert(shadow_target != nullptr);
+		Target* shadow_target = gShadowAtlas->GetTarget();
+		Assert(shadow_target != nullptr);
 
-	ds_entries.Insert(DescriptorEntry::AsImage(4, eShaderType::Pixel, &shadow_target->Image,
-											   gSamplerCache->Request({
-												   eSamplerFilter::Linear,
-												   eSamplerFilter::Linear,
-												   eSamplerFilter::Linear,
-												   eSamplerAddressMode::ClampToBorder,
-												   eSamplerBorderColor::FloatWhite,
-												   eSamplerCompareOp::Greater,
-											   })));
+		ds_entries.Insert(DescriptorEntry::AsImage(4, eShaderType::Pixel, &shadow_target->Image,
+												   gSamplerCache->Request({
+													   eSamplerFilter::Linear,
+													   eSamplerFilter::Linear,
+													   eSamplerFilter::Linear,
+													   eSamplerAddressMode::ClampToBorder,
+													   eSamplerBorderColor::FloatWhite,
+													   eSamplerCompareOp::Greater,
+												   })));
 
-	Target* ssao_target = SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm);
-	Assert(ssao_target != nullptr);
+		Target* ssao_target = SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm);
+		Assert(ssao_target != nullptr);
 
-	// Linear since the AO target is half resolution so point sampling it at full resolution shows the
-	// 2x2 blocks it was rendered at. Had this bad boy nearest for a while and it looked like shit
-	ds_entries.Insert(DescriptorEntry::AsImage(5, eShaderType::Pixel, &ssao_target->Image,
-											   gSamplerCache->Request({
-												   eSamplerFilter::Linear,
-												   eSamplerFilter::Linear,
-												   eSamplerFilter::Linear,
-											   })));
+		// Linear since the AO target is half resolution so point sampling it at full resolution shows the
+		// 2x2 blocks it was rendered at. Had this bad boy nearest for a while and it looked like shit
+		ds_entries.Insert(DescriptorEntry::AsImage(5, eShaderType::Pixel, &ssao_target->Image,
+												   gSamplerCache->Request({
+													   eSamplerFilter::Linear,
+													   eSamplerFilter::Linear,
+													   eSamplerFilter::Linear,
+												   })));
 
-	// bDecals
-	ds_entries.Insert(
-		DescriptorEntry::AsBuffer(9, eShaderType::Pixel, &gGraphics->DecalBuffer, 0, gGraphics->DecalPageSize));
+		// bDecals
+		ds_entries.Insert(
+			DescriptorEntry::AsBuffer(9, eShaderType::Pixel, &gGraphics->DecalBuffer, 0, gGraphics->DecalPageSize));
 
-	// bDecalMasks
-	ds_entries.Insert(DescriptorEntry::AsBuffer(10, eShaderType::Pixel, &gGraphics->DecalMaskBuffer, 0,
-												gGraphics->DecalMaskPageSize));
+		// bDecalMasks
+		ds_entries.Insert(DescriptorEntry::AsBuffer(10, eShaderType::Pixel, &gGraphics->DecalMaskBuffer, 0,
+													gGraphics->DecalMaskPageSize));
 
-	// tDecalAtlas and tDecalNormalAtlas, blank until DecalManager hands over the loaded atlases
-	Image* null_image = gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm);
-	Image* decal_atlas = (mpDecalAtlas != nullptr) ? mpDecalAtlas : null_image;
-	Image* decal_normal_atlas = (mpDecalNormalAtlas != nullptr) ? mpDecalNormalAtlas : null_image;
+		// tDecalAtlas and tDecalNormalAtlas, blank until DecalManager hands over the loaded atlases
+		Image* null_image = gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm);
+		Image* decal_atlas = (mpDecalAtlas != nullptr) ? mpDecalAtlas : null_image;
+		Image* decal_normal_atlas = (mpDecalNormalAtlas != nullptr) ? mpDecalNormalAtlas : null_image;
 
-	ds_entries.Insert(DescriptorEntry::AsImage(11, eShaderType::Pixel, decal_atlas, gSamplerCache->Request({})));
-	ds_entries.Insert(DescriptorEntry::AsImage(12, eShaderType::Pixel, decal_normal_atlas, gSamplerCache->Request({})));
+		ds_entries.Insert(DescriptorEntry::AsImage(11, eShaderType::Pixel, decal_atlas, gSamplerCache->Request({})));
+		ds_entries.Insert(DescriptorEntry::AsImage(12, eShaderType::Pixel, decal_normal_atlas, gSamplerCache->Request({})));
 
-	// tSceneColor
-	ds_entries.Insert(DescriptorEntry::AsImage(19, eShaderType::Pixel,
-											   &SceneCopyPass.GetTarget(eImageFormat::RGBA16_Float)->Image,
-											   gSamplerCache->Request({
-												   eSamplerFilter::Linear,
-												   eSamplerFilter::Linear,
-												   eSamplerFilter::Linear,
-												   eSamplerAddressMode::ClampToEdge,
-											   })));
+		// tSceneColor
+		ds_entries.Insert(DescriptorEntry::AsImage(19, eShaderType::Pixel,
+												   &SceneCopyPass.GetTarget(eImageFormat::RGBA16_Float)->Image,
+												   gSamplerCache->Request({
+													   eSamplerFilter::Linear,
+													   eSamplerFilter::Linear,
+													   eSamplerFilter::Linear,
+													   eSamplerAddressMode::ClampToEdge,
+												   })));
 
-	// tSceneDepth
-	ds_entries.Insert(DescriptorEntry::AsImage(20, eShaderType::Pixel,
-											   &SceneCopyPass.GetTarget(eImageFormat::D32_Float)->Image,
-											   gSamplerCache->Request({
-												   eSamplerFilter::Nearest,
-												   eSamplerFilter::Nearest,
-												   eSamplerFilter::Nearest,
-												   eSamplerAddressMode::ClampToEdge,
-											   })));
+		// tSceneDepth
+		ds_entries.Insert(DescriptorEntry::AsImage(20, eShaderType::Pixel,
+												   &SceneCopyPass.GetTarget(eImageFormat::D32_Float)->Image,
+												   gSamplerCache->Request({
+													   eSamplerFilter::Nearest,
+													   eSamplerFilter::Nearest,
+													   eSamplerFilter::Nearest,
+													   eSamplerAddressMode::ClampToEdge,
+												   })));
 
-	// The runtime GI probes
-	ProbeClipmap& clipmap = gGraphics->GIClipmap;
+		// The runtime GI probes
+		ProbeClipmap& clipmap = gGraphics->GIClipmap;
 
-	Sampler* clipmap_sampler = gSamplerCache->Request({
-		eSamplerFilter::Linear,
-		eSamplerFilter::Linear,
-		eSamplerFilter::Nearest,
-		eSamplerAddressMode::ClampToEdge,
-	});
+		Sampler* clipmap_sampler = gSamplerCache->Request({
+			eSamplerFilter::Linear,
+			eSamplerFilter::Linear,
+			eSamplerFilter::Nearest,
+			eSamplerAddressMode::ClampToEdge,
+		});
 
-	ds_entries.Insert(DescriptorEntry::AsImage(21, eShaderType::Pixel, clipmap.GetIrradianceImage(), clipmap_sampler));
+		ds_entries.Insert(DescriptorEntry::AsImage(21, eShaderType::Pixel, clipmap.GetIrradianceImage(), clipmap_sampler));
 
-	// The half resolution gather, read texel by texel
-	Sampler* resolve_sampler = gSamplerCache->Request({
-		eSamplerFilter::Nearest,
-		eSamplerFilter::Nearest,
-		eSamplerFilter::Nearest,
-		eSamplerAddressMode::ClampToEdge,
-	});
+		// The half resolution gather, read texel by texel
+		Sampler* resolve_sampler = gSamplerCache->Request({
+			eSamplerFilter::Nearest,
+			eSamplerFilter::Nearest,
+			eSamplerFilter::Nearest,
+			eSamplerAddressMode::ClampToEdge,
+		});
 
-	ds_entries.Insert(DescriptorEntry::AsImage(22, eShaderType::Pixel,
-											   &GIResolvePass.GetTarget(eImageFormat::RGBA16_Float)->Image,
-											   resolve_sampler));
-	ds_entries.Insert(DescriptorEntry::AsImage(23, eShaderType::Pixel,
-											   &GIResolvePass.GetTarget(eImageFormat::R32_UInt)->Image, resolve_sampler));
-	ds_entries.Insert(DescriptorEntry::AsImage(25, eShaderType::Pixel,
-											   &GIResolvePass.GetTarget(eImageFormat::RG16_Float)->Image,
-											   resolve_sampler));
-	ds_entries.Insert(DescriptorEntry::AsImage(24, eShaderType::Pixel, clipmap.GetMomentsImage(), clipmap_sampler));
-	ds_entries.Insert(DescriptorEntry::AsBuffer(28, eShaderType::Pixel, clipmap.GetProbeBuffer(), 0,
-												ProbeClipmap::scProbesSize));
-	ds_entries.Insert(DescriptorEntry::AsBuffer(29, eShaderType::Pixel, clipmap.GetForwardDataBuffer(), 0,
-												ProbeClipmap::scForwardDataFrameSize));
-	ds_entries.Insert(DescriptorEntry::AsImage(30, eShaderType::Pixel, gGraphics->pFogShadowAtlas, GetFogShadowSampler()));
-	ds_entries.Insert(DescriptorEntry::AsBuffer(31, eShaderType::Pixel, &gGraphics->FogShadowPageBuffer, 0,
-												gGraphics->FogShadowPageBufferSize));
+		ds_entries.Insert(DescriptorEntry::AsImage(22, eShaderType::Pixel,
+												   &resolve.GetTarget(eImageFormat::RGBA16_Float)->Image, resolve_sampler));
+		ds_entries.Insert(DescriptorEntry::AsImage(23, eShaderType::Pixel,
+												   &resolve.GetTarget(eImageFormat::RG32_UInt)->Image, resolve_sampler));
+		ds_entries.Insert(DescriptorEntry::AsImage(24, eShaderType::Pixel, clipmap.GetMomentsImage(), clipmap_sampler));
+		ds_entries.Insert(DescriptorEntry::AsBuffer(28, eShaderType::Pixel, clipmap.GetProbeBuffer(), 0,
+													ProbeClipmap::scProbesSize));
+		ds_entries.Insert(DescriptorEntry::AsBuffer(29, eShaderType::Pixel, clipmap.GetForwardDataBuffer(), 0,
+													ProbeClipmap::scForwardDataFrameSize));
+		ds_entries.Insert(
+			DescriptorEntry::AsImage(30, eShaderType::Pixel, gGraphics->pFogShadowAtlas, GetFogShadowSampler()));
+		ds_entries.Insert(DescriptorEntry::AsBuffer(31, eShaderType::Pixel, &gGraphics->FogShadowPageBuffer, 0,
+													gGraphics->FogShadowPageBufferSize));
 
-	result = gDescriptorCache->Request(ds_entries);
-	pPersistentDescriptor = result.second;
+		PersistentDescriptors[index] = gDescriptorCache->Request(ds_entries).second;
+	}
+
+	pPersistentDescriptor = PersistentDescriptors[GIResolveIndex];
 }
 
 void TiledForwardRenderer::RebuildPersistentDescriptor()
 {
-	DescriptorSet* old_descriptor = pPersistentDescriptor;
+	DescriptorSet* old_descriptors[2] = { PersistentDescriptors[0], PersistentDescriptors[1] };
 
 	BuildPersistentDescriptor();
 
-	if (old_descriptor != nullptr && old_descriptor != pPersistentDescriptor) {
-		gDescriptorCache->Free(old_descriptor->ID);
+	for (uint32 index = 0; index < 2; index++) {
+		DescriptorSet* old_descriptor = old_descriptors[index];
+
+		if (old_descriptor != nullptr && old_descriptor != PersistentDescriptors[index]) {
+			gDescriptorCache->Free(old_descriptor->ID);
+		}
 	}
 }
 
@@ -431,25 +439,17 @@ void TiledForwardRenderer::CreateSSAOBlurPSO()
 
 void TiledForwardRenderer::CreateGIResolvePSO()
 {
-	GIResolvePass.Create("GIResolve", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
-
 	constexpr VkImageUsageFlags scUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	const char* names[2] = { "GIResolveA", "GIResolveB" };
 
-	// The diffuse and the normal are copied into GIHistoryPass after each frame's resolve
-	GIResolvePass.AddTarget(eImageFormat::RGBA16_Float, scUsage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-							eImageAspectFlag::Color);
-	GIResolvePass.AddTarget(eImageFormat::R32_UInt, scUsage, eImageAspectFlag::Color);
-	GIResolvePass.AddTarget(eImageFormat::RG16_Float, scUsage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-							eImageAspectFlag::Color);
-	GIResolvePass.BuildRenderStage();
+	for (uint32 index = 0; index < 2; index++) {
+		RenderStage& stage = GIResolvePasses[index];
 
-	// Last frame's resolve, which this frame's reprojects. Never rendered to, only copied into.
-	GIHistoryPass.Create("GIHistory", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
-	GIHistoryPass.AddTarget(eImageFormat::RGBA16_Float, scUsage | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-							eImageAspectFlag::Color);
-	GIHistoryPass.AddTarget(eImageFormat::RG16_Float, scUsage | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-							eImageAspectFlag::Color);
-	GIHistoryPass.BuildRenderStage();
+		stage.Create(names[index], gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
+		stage.AddTarget(eImageFormat::RGBA16_Float, scUsage, eImageAspectFlag::Color);
+		stage.AddTarget(eImageFormat::RG32_UInt, scUsage, eImageAspectFlag::Color);
+		stage.BuildRenderStage();
+	}
 
 	ProbeClipmap& clipmap = gGraphics->GIClipmap;
 
@@ -466,30 +466,49 @@ void TiledForwardRenderer::CreateGIResolvePSO()
 		eSamplerAddressMode::ClampToEdge,
 	});
 
-	gPSOBuild->BeginPipeline(ePipelineName::ProbeClipmapResolve);
+	// Whether the screen probes and the history are read is fixed per frame, so they are permutations
+	// Each writes one of GIResolvePasses and reads the other as last frame's (see ProbeClipmapResolvePipeline)
+	const auto build_resolve = [&](ePipelineName name, uint32 write, const SizedArray<ShaderMacro>& macros)
+	{
+		RenderStage& history_stage = GIResolvePasses[1 - write];
 
-	gPSOBuild->UseRenderStage(GIResolvePass);
-	gPSOBuild->SetShader(eShaderName::ProbeClipmapResolve, {});
-	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
-	gPSOBuild->SetCullMode(eCullMode::None);
+		gPSOBuild->BeginPipeline(name);
 
-	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::D32_Float), point_sampler);
-	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::RGBA16_Float),
-								  point_sampler);
-	gPSOBuild->AddImage(2, 0, eShaderType::Pixel, clipmap.GetIrradianceImage(), clipmap_sampler);
-	gPSOBuild->AddImage(3, 0, eShaderType::Pixel, clipmap.GetMomentsImage(), clipmap_sampler);
-	gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, clipmap.GetProbeBuffer(), 0, ProbeClipmap::scProbesSize);
-	gPSOBuild->AddBuffer(5, 0, eShaderType::Pixel, clipmap.GetForwardDataBuffer(), 0,
-						 ProbeClipmap::scForwardDataFrameSize);
-	gPSOBuild->AddImageFromTarget(6, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::RG16_Float), point_sampler);
-	gPSOBuild->AddImageFromTarget(7, 0, eShaderType::Pixel, GIHistoryPass.GetTarget(eImageFormat::RGBA16_Float),
-								  point_sampler);
-	gPSOBuild->AddImageFromTarget(8, 0, eShaderType::Pixel, GIHistoryPass.GetTarget(eImageFormat::RG16_Float),
-								  point_sampler);
-	gPSOBuild->AddBuffer(9, 0, eShaderType::Pixel, clipmap.GetScreenProbeBuffer(), 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddFrameData(1);
+		gPSOBuild->UseRenderStage(GIResolvePasses[write]);
+		gPSOBuild->SetShader(eShaderName::ProbeClipmapResolve, macros);
+		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
+		gPSOBuild->SetCullMode(eCullMode::None);
 
-	gPSOBuild->EndPipeline();
+		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::D32_Float),
+									  point_sampler);
+		gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::RGBA16_Float),
+									  point_sampler);
+		gPSOBuild->AddImage(2, 0, eShaderType::Pixel, clipmap.GetIrradianceImage(), clipmap_sampler);
+		gPSOBuild->AddImage(3, 0, eShaderType::Pixel, clipmap.GetMomentsImage(), clipmap_sampler);
+		gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, clipmap.GetProbeBuffer(), 0, ProbeClipmap::scProbesSize);
+		gPSOBuild->AddBuffer(5, 0, eShaderType::Pixel, clipmap.GetForwardDataBuffer(), 0,
+							 ProbeClipmap::scForwardDataFrameSize);
+		gPSOBuild->AddImageFromTarget(6, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::RG16_Float),
+									  point_sampler);
+		gPSOBuild->AddImageFromTarget(7, 0, eShaderType::Pixel, history_stage.GetTarget(eImageFormat::RGBA16_Float),
+									  point_sampler);
+		gPSOBuild->AddImageFromTarget(8, 0, eShaderType::Pixel, history_stage.GetTarget(eImageFormat::RG32_UInt),
+									  point_sampler);
+		gPSOBuild->AddBuffer(9, 0, eShaderType::Pixel, clipmap.GetScreenProbeBuffer(), 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddFrameData(1);
+
+		gPSOBuild->EndPipeline();
+	};
+
+	const ShaderMacro screen_probes { .pcName = "GI_SCREEN_PROBES", .pcValue = "1" };
+	const ShaderMacro history { .pcName = "GI_HISTORY", .pcValue = "1" };
+
+	for (uint32 write = 0; write < 2; write++) {
+		build_resolve(ProbeClipmapResolvePipeline(false, false, write), write, {});
+		build_resolve(ProbeClipmapResolvePipeline(true, false, write), write, { screen_probes });
+		build_resolve(ProbeClipmapResolvePipeline(false, true, write), write, { history });
+		build_resolve(ProbeClipmapResolvePipeline(true, true, write), write, { screen_probes, history });
+	}
 }
 
 void TiledForwardRenderer::CreateDebugLayerPSO()
@@ -819,11 +838,9 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 	ProbeClipmap& clipmap = gGraphics->GIClipmap;
 
 	gPSOBuild->AddImage(21, 0, eShaderType::Pixel, clipmap.GetIrradianceImage(), gSamplerCache->Request({}));
-	gPSOBuild->AddImageFromTarget(22, 0, eShaderType::Pixel, GIResolvePass.GetTarget(eImageFormat::RGBA16_Float),
-								  gSamplerCache->Request({}));
-	gPSOBuild->AddImageFromTarget(23, 0, eShaderType::Pixel, GIResolvePass.GetTarget(eImageFormat::R32_UInt),
-								  gSamplerCache->Request({}));
-	gPSOBuild->AddImageFromTarget(25, 0, eShaderType::Pixel, GIResolvePass.GetTarget(eImageFormat::RG16_Float),
+	gPSOBuild->AddImageFromTarget(22, 0, eShaderType::Pixel,
+								  GIResolvePasses[0].GetTarget(eImageFormat::RGBA16_Float), gSamplerCache->Request({}));
+	gPSOBuild->AddImageFromTarget(23, 0, eShaderType::Pixel, GIResolvePasses[0].GetTarget(eImageFormat::RG32_UInt),
 								  gSamplerCache->Request({}));
 	gPSOBuild->AddImage(24, 0, eShaderType::Pixel, clipmap.GetMomentsImage(), gSamplerCache->Request({}));
 	gPSOBuild->AddBuffer(28, 0, eShaderType::Pixel, clipmap.GetProbeBuffer(), 0, ProbeClipmap::scProbesSize);
@@ -1111,8 +1128,7 @@ void TiledForwardRenderer::CreateParticlePSO()
 	// Lit particles take the light around them from the runtime GI probes
 	ProbeClipmap& clipmap = gGraphics->GIClipmap;
 
-	gPSOBuild->AddImage(3, 0, eShaderType::Vertex, clipmap.GetIrradianceImage(), gSamplerCache->Request(SamplerProps {}));
-	gPSOBuild->AddBuffer(6, 0, eShaderType::Vertex, clipmap.GetProbeBuffer(), 0, ProbeClipmap::scProbesSize);
+	gPSOBuild->AddImage(3, 0, eShaderType::Vertex, clipmap.GetMeanImage(), gSamplerCache->Request(SamplerProps {}));
 	gPSOBuild->AddBuffer(7, 0, eShaderType::Vertex, clipmap.GetForwardDataBuffer(), 0,
 						 ProbeClipmap::scForwardDataFrameSize);
 
@@ -1204,8 +1220,15 @@ void TiledForwardRenderer::CreateFogPSO()
 										  eSamplerCompareOp::Greater,
 									  }));
 
-		// The ambient light of the fog is the mean of the runtime GI probes around it
-		gPSOBuild->AddImage(5, 0, eShaderType::Compute, clipmap.GetIrradianceImage(), volume_sampler);
+		// The ambient light of the fog is the mean of the runtime GI probes around it. The sampler repeats, as the
+		// probe slots wrap.
+		gPSOBuild->AddImage(5, 0, eShaderType::Compute, clipmap.GetMeanImage(),
+							gSamplerCache->Request({
+								eSamplerFilter::Linear,
+								eSamplerFilter::Linear,
+								eSamplerFilter::Nearest,
+								eSamplerAddressMode::Repeat,
+							}));
 
 		gPSOBuild->AddStorageImage(8, 0, eShaderType::Compute, &FroxelLighting);
 		gPSOBuild->AddImage(9, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas, GetFogShadowSampler());
@@ -1213,7 +1236,6 @@ void TiledForwardRenderer::CreateFogPSO()
 							 gGraphics->FogShadowPageBufferSize);
 		gPSOBuild->AddImage(11, 0, eShaderType::Compute, &FroxelHistory, volume_sampler);
 		gPSOBuild->AddStorageImage(12, 0, eShaderType::Compute, &FroxelSurface);
-		gPSOBuild->AddBuffer(13, 0, eShaderType::Compute, clipmap.GetProbeBuffer(), 0, ProbeClipmap::scProbesSize);
 		gPSOBuild->AddBuffer(14, 0, eShaderType::Compute, clipmap.GetForwardDataBuffer(), 0,
 							 ProbeClipmap::scForwardDataFrameSize);
 

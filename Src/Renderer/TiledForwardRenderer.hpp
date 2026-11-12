@@ -228,10 +228,11 @@ public:
 	RenderStage SSAODenoisePass;
 	RenderStage SSAOBlurPass;
 
-	/// The GI probes gathered at half resolution: diffuse + eye distance, packed specular, normal
-	RenderStage GIResolvePass;
-	/// Last frame's GIResolvePass diffuse and normal, see GraphicsBackend::RenderGIResolve
-	RenderStage GIHistoryPass;
+	/// The GI probes gathered at half resolution: diffuse + eye distance, then the packed specular and normal. Two,
+	/// used in turn: each frame's resolve writes one and reprojects the other, last frame's, so nothing is copied.
+	/// GIResolveIndex is the one the forward pass reads, the last written.
+	RenderStage GIResolvePasses[2];
+	uint32 GIResolveIndex = 0;
 
 	/* Volumetric Lighting */
 	RenderStage FogApplyPass;
@@ -245,7 +246,9 @@ public:
 
 
 	/// Descriptors that remain bound for the entirety of the frame. This includes object buffer, material buffer, etc.
+	/// One of PersistentDescriptors: the one whose GI resolve images are GIResolvePasses[GIResolveIndex].
 	DescriptorSet* pPersistentDescriptor = nullptr;
+	DescriptorSet* PersistentDescriptors[2] = { nullptr, nullptr };
 
 	/// Persistent descriptor that only applies for the object and material buffers.
 	DescriptorSet* pPersistentDescriptorSlim = nullptr;

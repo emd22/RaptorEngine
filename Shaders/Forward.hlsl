@@ -262,9 +262,9 @@ F_StructBuffer(bProbes, uint4, 28, 0);
 
 // The probes gathered at half resolution for the main view, see ProbeClipmapResolve.hlsl
 F_Texture2D(tGIDiffuse, 22, 0)
-Texture2D<uint> tGISpecularTexture : register(t23, space0);
-SamplerState tGISpecular : register(s23, space0);
-F_Texture2D(tGINormal, 25, 0)
+/// The specular, then the normal, see ProbeClipmapResolve.hlsl
+Texture2D<uint2> tGIPackedTexture : register(t23, space0);
+SamplerState tGIPacked : register(s23, space0);
 #include "ProbeClipmapResolve.hlsli"
 F_StructBuffer(bClipmapForward, ClipmapForwardData, 29, 0);
 F_ShadowTexture2D(tFogShadowAtlas, 30, 0);
@@ -778,13 +778,14 @@ PERMNOT(PROBE_CAPTURE);
 			const int3 coord = int3(min(base + offset, int2(gi_width, gi_height) - 1), 0);
 
 			const float4 diffuse = F_SampleLoad(tGIDiffuse, coord);
-			const uint specular = F_SampleLoad(tGISpecular, coord);
-			const float3 normal = GIResolveDecodeNormal(F_SampleLoad(tGINormal, coord).xy);
+			const uint2 packed = F_SampleLoad(tGIPacked, coord);
+			const uint specular = packed.x;
+			const float3 normal = GIResolveUnpackNormal(packed.y);
 
 			const float2 axis = lerp(1.0 - frac_xy, frac_xy, float2(offset));
 			const float relative_depth = abs(diffuse.a - pixel_distance) / max(pixel_distance, 1e-3);
 			const float depth_weight = saturate(1.0 - relative_depth * 40.0);
-			const float normal_weight = pow(saturate(dot(normal, N)), 8.0);
+			const float normal_weight = GIPow8(saturate(dot(normal, N)));
 			const float weight = axis.x * axis.y * depth_weight * depth_weight * normal_weight *
 								 select(diffuse.a > 0.0, 1.0, 0.0);
 

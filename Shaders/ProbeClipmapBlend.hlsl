@@ -10,6 +10,8 @@ F_StructBuffer(bRays, float4, 1, 0);
 [[vk::image_format("rg16f")]] [[vk::binding(5, 0)]] RWTexture2D<float2> tMoments;
 
 F_RWStructBuffer(bProbes, uint4, 9, 0);
+/// Each probe's mean light for the fog and the particles, see ProbeClipmapMean.hlsli
+[[vk::image_format("rgba16f")]] [[vk::binding(10, 0)]] RWTexture3D<float4> tMean;
 
 F_FrameData(ProbeClipmapConsts, Consts, 1);
 
@@ -39,8 +41,13 @@ static const int3 scNeighbourSteps[6] = { int3(1, 0, 0), int3(-1, 0, 0), int3(0,
 /// Each ray's radiance and signed distance, and its direction with the distance the depth moments take for it
 groupshared float4 sRays[CLIPMAP_RAYS];
 groupshared float4 sDirectionDepth[CLIPMAP_RAYS];
-/// Per wave: the probe's stored luminance, its short term luminance, how many rays hit back faces
-groupshared float3 sPartialSums[CLIPMAP_RAYS];
+/// Waves are at least 4 lanes wide, so a group has at most this many
+#define CLIPMAP_MAX_WAVES (CLIPMAP_RAYS / 4)
+/// Per wave: the probe's stored luminance, its short term luminance, how many rays hit back faces and how many touch
+/// a surface
+groupshared float4 sPartialSums[CLIPMAP_MAX_WAVES];
+/// Per wave: the direction of its nearest back face hit, and its distance
+groupshared float4 sClosestBack[CLIPMAP_MAX_WAVES];
 groupshared float4 sIrradiance[CLIPMAP_IRRADIANCE_SIZE * CLIPMAP_IRRADIANCE_SIZE];
 groupshared float2 sMoments[CLIPMAP_MOMENTS_SIZE * CLIPMAP_MOMENTS_SIZE];
 /// Per neighbour: its irradiance tile origin, and its weight (0 where it isn't shared with)
@@ -50,12 +57,15 @@ groupshared float4 sPrior[8];
 
 float Luminance(float3 colour) { return dot(colour, float3(0.2126, 0.7152, 0.0722)); }
 
-float3 TexelDirection(uint2 texel, uint size) { return ClipmapOctToDirection((float2(texel) + 0.5) / float(size) * 2.0 - 1.0); }
+float3 TexelDirection(uint2 texel, uint size)
+{
+	return ClipmapOctToDirection((float2(texel) + 0.5) / float(size) * 2.0 - 1.0);
+}
 
 /// Mean and second moment of the ray distances around `normal`
 float2 GatherMoments(float3 normal, out float out_weight)
 {
-	const float sharpness_log2e = Consts.vBlend.w * 1.44269504;
+	const float sharpness_log2e = Consts.vBlend.x;
 
 	float2 sum = float2(0.0, 0.0);
 	float weight_sum = 0.0;
@@ -83,12 +93,12 @@ float2 GatherMoments(float3 normal, out float out_weight)
  */
 float2 BlendMoments(float2 stored, float2 fresh, float fresh_weight, float rate, bool reset)
 {
-	// The lobe's mean over the sphere, times the ray count
-	const float expected_weight = float(CLIPMAP_RAYS) / (2.0 * (Consts.vBlend.w + 1.0));
-	const float coverage = saturate(fresh_weight / expected_weight);
+	const float coverage = saturate(fresh_weight * Consts.vBlend.y);
 	const float2 blended = lerp(stored, fresh, rate * coverage);
+	const float2 result = select(reset, fresh, select(fresh_weight > 1e-6, blended, stored));
 
-	return select(reset, fresh, select(fresh_weight > 1e-6, blended, stored));
+	// Every reader trusts the atlas to hold no NaN, so the blend is where it is kept out
+	return select(GIIsFinite(float3(result, 0.0)), result, stored);
 }
 
 [numthreads(CLIPMAP_RAYS, 1, 1)]
@@ -132,20 +142,40 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	sRays[thread] = own_ray;
 	sDirectionDepth[thread] = float4(own_direction, own_depth);
 
-	// The probe's stored light and its short term light over all of its texels (as many as there are threads), and
-	// its back face count, summed once per wave here instead of by every thread
+	// Rays this close to the probe touch a surface, see the relocation below
+	const float spacing = level.vParams.x;
+	const float min_front = min(CLIPMAP_MIN_FRONTFACE * spacing, CLIPMAP_MIN_FRONTFACE_METRES);
+	const float touching = min_front * 0.25;
+
+	const bool own_backface = own_ray.w < 0.0;
+	const float own_abs_distance = abs(own_ray.w);
+
+	// The probe's stored light and its short term light over all of its texels (as many as there are threads), its
+	// back face and touching counts, and its nearest back face, reduced once per wave here instead of by every thread
 	const float3 wave_sums = WaveActiveSum(float3(Luminance(stored_irradiance.rgb), stored_irradiance.a,
-												   select(own_ray.w < 0.0, 1.0, 0.0)));
+												   select(own_backface, 1.0, 0.0)));
+	const uint wave_touching = WaveActiveCountBits(own_abs_distance < touching);
+
+	const float back_distance = select(own_backface, own_abs_distance, 1e30);
+	const float wave_closest = WaveActiveMin(back_distance);
+	// The lowest lane holding it, so ties go to the first ray as a loop over the rays would
+	const uint4 closest_ballot = WaveActiveBallot(and(own_backface, back_distance == wave_closest));
+	const uint closest_low = firstbitlow(closest_ballot.x);
+	const uint closest_lane = select(closest_ballot.x != 0u, closest_low,
+									 select(closest_ballot.y != 0u, 32u + firstbitlow(closest_ballot.y), 0u));
+	const float3 wave_closest_direction = WaveReadLaneAt(own_direction, closest_lane);
+
 	const uint wave_index = thread / WaveGetLaneCount();
 	const uint wave_count = (CLIPMAP_RAYS + WaveGetLaneCount() - 1) / WaveGetLaneCount();
 
 	if (WaveIsFirstLane()) {
-		sPartialSums[wave_index] = wave_sums;
+		sPartialSums[wave_index] = float4(wave_sums, float(wave_touching));
+		sClosestBack[wave_index] = float4(wave_closest_direction, wave_closest);
 	}
 
 	GroupMemoryBarrierWithGroupSync();
 
-	float3 probe_sums = float3(0.0, 0.0, 0.0);
+	float4 probe_sums = float4(0.0, 0.0, 0.0, 0.0);
 
 	for (uint wave = 0; wave < wave_count; wave++) {
 		probe_sums += sPartialSums[wave];
@@ -189,8 +219,9 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 
 	// The next coarser level's cell around a new probe. A probe scrolled in at the edge of its level's window was a
 	// random shade over its first updates, 64 rays each, which showed most while moving, as the finer level took over.
-	if (and(thread >= 8, thread < 16)) {
-		const uint corner = thread - 8;
+	// On the second wave where waves are 32 wide, so it runs alongside the neighbours instead of after them
+	if (and(thread >= 32, thread < 40)) {
+		const uint corner = thread - 32;
 		float weight = 0.0;
 		uint2 origin = uint2(0, 0);
 
@@ -255,29 +286,44 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	float3 neighbour_sum = float3(0.0, 0.0, 0.0);
 	float neighbour_weight = 0.0;
 
+	// The weights are the same for the whole group, so these branches don't diverge, and skip the loads of the
+	// neighbours that aren't shared with
 	[unroll]
 	for (uint side = 0; side < 6; side++) {
 		const float4 neighbour = sNeighbours[side];
 
-		neighbour_sum += tIrradiance[uint2(neighbour.xy) + irradiance_texel + 1].rgb * neighbour.w;
+		if (neighbour.w > 0.0) {
+			neighbour_sum += tIrradiance[uint2(neighbour.xy) + irradiance_texel + 1].rgb * neighbour.w;
+		}
+
 		neighbour_weight += neighbour.w;
 	}
 
 	const float3 fresh = (own_fresh + neighbour_sum) / (1.0 + neighbour_weight);
 
-	// All levels share the octahedral layout, so the same texel of a coarser probe is the same direction
-	float3 prior_sum = float3(0.0, 0.0, 0.0);
+	// All levels share the octahedral layout, so the same texel of a coarser probe is the same direction. Only a new
+	// probe has a prior, and only its read corners are loaded.
 	float prior_weight = 0.0;
 
 	[unroll]
-	for (uint corner = 0; corner < 8; corner++) {
-		const float4 coarse = sPrior[corner];
-
-		prior_sum += tIrradiance[uint2(coarse.xy) + irradiance_texel + 1].rgb * coarse.w;
-		prior_weight += coarse.w;
+	for (uint weight_corner = 0; weight_corner < 8; weight_corner++) {
+		prior_weight += sPrior[weight_corner].w;
 	}
 
 	const bool has_prior = and(reset, prior_weight >= CLIPMAP_PRIOR_MIN_WEIGHT);
+	float3 prior_sum = float3(0.0, 0.0, 0.0);
+
+	if (has_prior) {
+		[unroll]
+		for (uint corner = 0; corner < 8; corner++) {
+			const float4 coarse = sPrior[corner];
+
+			if (coarse.w > 0.0) {
+				prior_sum += tIrradiance[uint2(coarse.xy) + irradiance_texel + 1].rgb * coarse.w;
+			}
+		}
+	}
+
 	const float3 prior = prior_sum / max(prior_weight, 1e-6);
 	const float3 previous = select(has_prior, prior, stored_irradiance.rgb);
 
@@ -285,9 +331,8 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	const uint blend_age = select(reset, select(has_prior, uint(CLIPMAP_PRIOR_UPDATES), 0u), data.uiAge);
 
 	// Levels that are traced less often take more of each update, so that all of them follow the light equally fast
-	const float level_rate = Consts.vLevelRate[level_index];
-	const float slow_hysteresis = pow(Consts.vBlend.x, level_rate);
-	const float fast_hysteresis = pow(Consts.vBlend.y, level_rate);
+	const float slow_hysteresis = Consts.vSlowHysteresis[level_index];
+	const float fast_hysteresis = Consts.vFastHysteresis[level_index];
 
 	// A probe that is still settling has its own short history to go on, not a change in its light
 	const bool is_settled = settle >= CLIPMAP_SETTLE_UPDATES;
@@ -300,7 +345,7 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	// A probe whose light is known to have changed blends fastest, then eases back over its dirty updates, so it
 	// does not stop on the noise of its last fast one
 	const float dirty = float(ClipmapJobDirty(job)) / float(CLIPMAP_DIRTY_UPDATES);
-	const float dirty_hysteresis = lerp(slow_hysteresis, Consts.vLevelRate.w, dirty);
+	const float dirty_hysteresis = lerp(slow_hysteresis, Consts.vSlowHysteresis.w, dirty);
 
 	// Over its first updates a probe keeps the plain mean of all it has traced, so a new probe is as good as its
 	// rays allow from the start instead of being one update's noise faded out over dozens
@@ -312,7 +357,10 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	const float short_term = select(and(reset, !has_prior), Luminance(fresh),
 									lerp(short_start, Luminance(fresh), CLIPMAP_SHORT_BLEND));
 
-	sIrradiance[thread] = float4(blended, short_term);
+	// Every reader trusts the atlas to hold no NaN, so the blend is where it is kept out
+	const float4 written_irradiance = float4(blended, short_term);
+	const bool is_finite = and(GIIsFinite(written_irradiance.rgb), GIIsFinite(written_irradiance.aaa));
+	sIrradiance[thread] = select(is_finite, written_irradiance, float4(0.0, 0.0, 0.0, 0.0));
 
 	// Depth moments, which settle the same way. They are most of the blend's work, and once a probe has settled they
 	// only change with the geometry, so they are refreshed on every other update, taking twice as much each time.
@@ -355,36 +403,24 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		// Relocation and classification from the rays, after DDGI (Majercik et al. 2021). A probe is only moved out of
 		// something it is inside, which the move itself takes away, so the per update noise of the rays can't nudge it
 		// around.
-		const float spacing = level.vParams.x;
 		const bool relocate = HAS_FLAG(Consts.vInfo.z, CLIPMAP_FLAG_RELOCATE);
 
 		// Where the trace started from, see ProbeClipmapTrace
 		const float3 previous_offset = select(reset, float3(0.0, 0.0, 0.0), data.vOffset);
 
-		const float min_front = min(CLIPMAP_MIN_FRONTFACE * spacing, CLIPMAP_MIN_FRONTFACE_METRES);
-		const float touching = min_front * 0.25;
-
-		uint backface_count = 0;
-		uint touching_count = 0;
+		// The counts and the nearest back face over all rays, from the per wave reductions above. Waves are in ray
+		// order, so a tie goes to the first ray.
+		const uint backface_count = uint(stray_count);
+		const uint touching_count = uint(probe_sums.w);
 		float closest_back = 1e30;
 		float3 closest_back_direction = float3(0.0, 0.0, 0.0);
 
-		for (uint ray = 0; ray < CLIPMAP_RAYS; ray++) {
-			const float signed_distance = sRays[ray].w;
-			const float distance = abs(signed_distance);
-			const float3 direction = sDirectionDepth[ray].xyz;
-			const bool is_touching = distance < touching;
+		for (uint wave_back = 0; wave_back < wave_count; wave_back++) {
+			const float4 wave_closest_back = sClosestBack[wave_back];
+			const bool is_closer = wave_closest_back.w < closest_back;
 
-			touching_count += select(is_touching, 1u, 0u);
-
-			if (signed_distance < 0.0) {
-				backface_count++;
-
-				if (distance < closest_back) {
-					closest_back = distance;
-					closest_back_direction = direction;
-				}
-			}
+			closest_back = select(is_closer, wave_closest_back.w, closest_back);
+			closest_back_direction = select(is_closer, wave_closest_back.xyz, closest_back_direction);
 		}
 
 		// On a surface, which a grid aligned map puts many probes on: every ray stops where it starts, half of them on
@@ -432,5 +468,21 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		written.uiSettle = min(settle + 1, CLIPMAP_PROBE_MAX_AGE);
 
 		bProbes[probe_index] = ClipmapEncodeProbe(probe, written);
+
+		// The mean light the fog and the particles read: irradiance straight up is the octahedral map's centre, and
+		// straight down its four corners, as a bilinear lookup of either reads them. Weighted by whether the probe can
+		// be read yet, so the readers' trilinear filter is the readable probes' weighted mean.
+		const uint centre = CLIPMAP_IRRADIANCE_SIZE / 2;
+		const uint last = CLIPMAP_IRRADIANCE_SIZE - 1;
+		const float3 up = sIrradiance[(centre - 1) + (centre - 1) * CLIPMAP_IRRADIANCE_SIZE].rgb +
+						  sIrradiance[centre + (centre - 1) * CLIPMAP_IRRADIANCE_SIZE].rgb +
+						  sIrradiance[(centre - 1) + centre * CLIPMAP_IRRADIANCE_SIZE].rgb +
+						  sIrradiance[centre + centre * CLIPMAP_IRRADIANCE_SIZE].rgb;
+		const float3 down = sIrradiance[0].rgb + sIrradiance[last].rgb + sIrradiance[last * CLIPMAP_IRRADIANCE_SIZE].rgb +
+							sIrradiance[last + last * CLIPMAP_IRRADIANCE_SIZE].rgb;
+		const float ready = select(written.uiSettle >= CLIPMAP_READY_UPDATES, 1.0, 0.0);
+		const uint3 mean_texel = ClipmapSlotCoord(slot) + uint3(0, 0, level_index * CLIPMAP_GRID_Z);
+
+		tMean[mean_texel] = float4((up + down) * (0.125 * ready), ready);
 	}
 }

@@ -37,29 +37,25 @@ struct FSOutput
 {
 	/// Irradiance / pi along the normal, distance from the eye in A
 	float4 vDiffuse : SV_TARGET0;
-	/// Irradiance / pi along the reflection, see GIResolvePackSpecular
-	uint uiSpecular : SV_TARGET1;
-	/// The normal the gather used, octahedral
-	float2 vNormal : SV_TARGET2;
+	/// Irradiance / pi along the reflection (GIResolvePackSpecular), and the normal the gather used
+	/// (GIResolvePackNormal)
+	uint2 uiSpecularNormal : SV_TARGET1;
 };
 
 struct ProbeClipmapResolveConsts
 {
 	float4x4 mInvViewProjection;
 	float4 vEyePosition;
-	/// Full resolution width and height, flags (GI_RESOLVE_FLAG_*)
+	/// Full resolution width and height
 	uint4 vInfo;
 	/// Where the eye was last frame, which the history's distances are from
 	float4 vPrevEyePosition;
-	/// Screen probe tile size
+	/// Screen probe tile size, then the history's width and height
 	uint4 vScreenProbes;
 	/// How much of each frame's light goes into the history (the rest is the history), the least it takes after a
 	/// disocclusion ramp
 	float4 vTemporal;
 };
-
-#define GI_RESOLVE_FLAG_SCREEN_PROBES 0x01
-#define GI_RESOLVE_FLAG_HISTORY 0x02
 
 /// A history texel stands for the pixel when its distance from last frame's eye is within this share of the expected
 #define GI_HISTORY_DEPTH_SHARE 0.03
@@ -73,9 +69,10 @@ F_StructBuffer(bProbes, uint4, 4, 0);
 F_StructBuffer(bClipmapForward, ClipmapForwardData, 5, 0);
 /// Prepass motion: last frame's uv minus this frame's
 F_Texture2D(tMotion, 6, 0);
-/// Last frame's output: diffuse (A eye distance) and the normal
+/// Last frame's output: diffuse (A eye distance), and the specular and normal (Y is the normal)
 F_Texture2D(tHistoryDiffuse, 7, 0);
-F_Texture2D(tHistoryNormal, 8, 0);
+Texture2D<uint2> tHistoryPackedTexture : register(t8, space0);
+SamplerState tHistoryPacked : register(s8, space0);
 F_StructBuffer(bScreenProbes, float4, 9, 0);
 
 F_FrameData(ProbeClipmapResolveConsts, Consts, 1);
@@ -122,8 +119,7 @@ FSOutput main(FSInput input)
 	const float3 R = GetSpecularDominantDir(N, reflect(-V, N), specular_alpha);
 
 	output.vDiffuse = float4(0.0, 0.0, 0.0, GI_RESOLVE_NO_SURFACE);
-	output.uiSpecular = 0;
-	output.vNormal = GIResolveEncodeNormal(N);
+	output.uiSpecularNormal = uint2(0, GIResolvePackNormal(N));
 
 	// Sky and viewmodel pixels gather nothing, and the forward pass gathers the viewmodel's itself
 	if (has_surface) {
@@ -137,22 +133,23 @@ FSOutput main(FSInput input)
 		const bool in_clipmap = clipmap.uiLevel < CLIPMAP_LEVELS;
 		const float3 fallback = bClipmapForward[0].vFallback.rgb;
 
+		// The probes hold no NaN (the blend and the screen probe trace keep it out), and neither does the history,
+		// which is this pass's own output: only the result is checked, once, below
 		float3 diffuse = select(in_clipmap, clipmap.vDiffuse, fallback);
-		diffuse = select(GIIsFinite(diffuse), diffuse, float3(0.0, 0.0, 0.0));
 
-		if (HAS_FLAG(Consts.vInfo.z, GI_RESOLVE_FLAG_SCREEN_PROBES)) {
-			float screen_weight;
-			const float3 screen = ScreenProbeGather(position, distance, geometric_normal, N, pixel, Consts.vInfo.xy,
-													Consts.vScreenProbes.x, screen_weight);
-			diffuse = select(GIIsFinite(screen), lerp(diffuse, screen, ScreenProbeShare(screen_weight)), diffuse);
-		}
+PERMIF(GI_SCREEN_PROBES);
+		float screen_weight;
+		const float3 screen = ScreenProbeGather(position, distance, geometric_normal, N, pixel, Consts.vInfo.xy,
+												Consts.vScreenProbes.x, screen_weight);
+		diffuse = lerp(diffuse, screen, ScreenProbeShare(screen_weight));
+PERMEND();
 
+PERMIF(GI_HISTORY);
 		// Last frame's light at the same surface, read from where the pixel was. Each history texel only counts if it
 		// was the same surface: as far from last frame's eye as this point is, facing the same way.
-		if (HAS_FLAG(Consts.vInfo.z, GI_RESOLVE_FLAG_HISTORY)) {
-			uint history_width;
-			uint history_height;
-			F_TextureName(tHistoryDiffuse).GetDimensions(history_width, history_height);
+		{
+			const uint history_width = Consts.vScreenProbes.y;
+			const uint history_height = Consts.vScreenProbes.z;
 
 			const float2 previous_uv = uv + F_SampleLoad(tMotion, int3(pixel, 0)).xy;
 			// Texel i holds full resolution pixel 2i
@@ -172,18 +169,15 @@ FSOutput main(FSInput input)
 				const int3 load = int3(clamp(coord, int2(0, 0), int2(history_width, history_height) - 1), 0);
 
 				const float4 texel = F_SampleLoad(tHistoryDiffuse, load);
-				const float3 texel_normal = GIResolveDecodeNormal(F_SampleLoad(tHistoryNormal, load).xy);
+				const float3 texel_normal = GIResolveUnpackNormal(F_SampleLoad(tHistoryPacked, load).y);
 
 				const float2 axis = lerp(1.0 - history_frac, history_frac, float2(offset));
 				const bool same_depth = abs(texel.a - expected) < expected * GI_HISTORY_DEPTH_SHARE;
 				const bool same_facing = dot(texel_normal, N) > GI_HISTORY_MIN_NORMAL;
-				const bool is_usable = and(and(in_bounds, texel.a > 0.0),
-										   and(and(same_depth, same_facing), GIIsFinite(texel.rgb)));
+				const bool is_usable = and(and(in_bounds, texel.a > 0.0), and(same_depth, same_facing));
 				const float weight = select(is_usable, axis.x * axis.y, 0.0);
 
-				// Selected, not multiplied away: 0 * NaN is NaN, and one NaN texel would spread to every pixel
-				// that reads it, frame after frame
-				history += select(weight > 0.0, texel.rgb * weight, float3(0.0, 0.0, 0.0));
+				history += texel.rgb * weight;
 				history_weight += weight;
 			}
 
@@ -193,10 +187,13 @@ FSOutput main(FSInput input)
 			const float blend = lerp(1.0, Consts.vTemporal.x, held);
 			diffuse = select(history_weight > 1e-3, lerp(history / max(history_weight, 1e-6), diffuse, blend), diffuse);
 		}
+PERMEND();
 
-		output.vDiffuse = float4(diffuse, distance);
-		output.uiSpecular = GIResolvePackSpecular(select(in_clipmap, clipmap.vSpecular, fallback),
-												   or(in_clipmap, any(fallback > 0.0)));
+		// A NaN kept here would spread through the history to every pixel that reads it, frame after frame
+		const float3 specular = select(in_clipmap, clipmap.vSpecular, fallback);
+		output.vDiffuse = float4(select(GIIsFinite(diffuse), diffuse, float3(0.0, 0.0, 0.0)), distance);
+		const float3 finite_specular = select(GIIsFinite(specular), specular, float3(0.0, 0.0, 0.0));
+		output.uiSpecularNormal.x = GIResolvePackSpecular(finite_specular, or(in_clipmap, any(fallback > 0.0)));
 	}
 
 	return output;

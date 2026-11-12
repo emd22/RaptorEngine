@@ -116,6 +116,82 @@ void AtlasTransition(const CommandBuffer& cmd, Image* atlas, VkImageLayout from,
 
 int32 FloorDiv(float32 value, float32 size) { return static_cast<int32>(std::floor(value / size)); }
 
+/// The triangle's face normal, plane and albedo, as SDFPageRecordFace and SDFPageRecordAlbedo read them
+SDFPageHitRecordGpu MakeHitRecord(const CompiledMapSDFPageTriangle& page_triangle)
+{
+	const float32(&corners)[3][4] = page_triangle.Corners;
+
+	float32 edge_b[3];
+	float32 edge_c[3];
+
+	for (uint32 axis = 0; axis < 3; axis++) {
+		edge_b[axis] = corners[1][axis] - corners[0][axis];
+		edge_c[axis] = corners[2][axis] - corners[0][axis];
+	}
+
+	const float32 normal[3] = {
+		edge_b[1] * edge_c[2] - edge_b[2] * edge_c[1],
+		edge_b[2] * edge_c[0] - edge_b[0] * edge_c[2],
+		edge_b[0] * edge_c[1] - edge_b[1] * edge_c[0],
+	};
+
+	const float32 length = std::sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+
+	uint32 albedo = 0;
+	memcpy(&albedo, &corners[0][3], sizeof(albedo));
+
+	SDFPageHitRecordGpu record;
+	record.Albedo = albedo & 0xFFFFFFu;
+
+	// The same threshold the shaders used on the cross product before
+	if (!(length > 1e-10f)) {
+		return record;
+	}
+
+	const float32 unit[3] = { normal[0] / length, normal[1] / length, normal[2] / length };
+	const float32 l1 = std::abs(unit[0]) + std::abs(unit[1]) + std::abs(unit[2]);
+	const auto sign = [](float32 value) { return (value >= 0.0f) ? 1.0f : -1.0f; };
+
+	float32 oct_x = unit[0] / l1;
+	float32 oct_y = unit[1] / l1;
+
+	if (unit[2] < 0.0f) {
+		const float32 folded_x = (1.0f - std::abs(oct_y)) * sign(oct_x);
+		const float32 folded_y = (1.0f - std::abs(oct_x)) * sign(oct_y);
+		oct_x = folded_x;
+		oct_y = folded_y;
+	}
+
+	const auto to_snorm = [](float32 value)
+	{ return static_cast<int32>(std::lround(std::clamp(value, -1.0f, 1.0f) * 32767.0f)); };
+
+	const int32 snorm_x = to_snorm(oct_x);
+	const int32 snorm_y = to_snorm(oct_y);
+
+	record.Normal = (static_cast<uint32>(snorm_x) & 0xFFFFu) | ((static_cast<uint32>(snorm_y) & 0xFFFFu) << 16);
+	record.Albedo |= SDFPageHitRecordGpu::scHasFace;
+
+	// The plane goes by the normal as the shaders decode it, so it holds the corners to within rounding
+	const float32 e_x = static_cast<float32>(snorm_x) / 32767.0f;
+	const float32 e_y = static_cast<float32>(snorm_y) / 32767.0f;
+	const float32 e_z = 1.0f - std::abs(e_x) - std::abs(e_y);
+
+	float32 decoded[3] = { e_x, e_y, e_z };
+
+	if (e_z < 0.0f) {
+		decoded[0] = (1.0f - std::abs(e_y)) * sign(e_x);
+		decoded[1] = (1.0f - std::abs(e_x)) * sign(e_y);
+	}
+
+	const float32 decoded_length =
+		std::sqrt(decoded[0] * decoded[0] + decoded[1] * decoded[1] + decoded[2] * decoded[2]);
+
+	record.Plane = (decoded[0] * corners[0][0] + decoded[1] * corners[0][1] + decoded[2] * corners[0][2]) /
+				   decoded_length;
+
+	return record;
+}
+
 } // namespace
 
 void SDFPageScene::CreateBuffer(RawGpuBuffer& buffer, uint64 size, const void* data)
@@ -141,6 +217,7 @@ void SDFPageScene::Create()
 {
 	CreateBuffer(mRefs, 0, nullptr);
 	CreateBuffer(mTriangles, 0, nullptr);
+	CreateBuffer(mHitRecords, 0, nullptr);
 
 	mIndirection.Create(eGpuBufferType::Storage, static_cast<uint64>(scSlotsPerLevel) * scMaxLevels * sizeof(uint32),
 						VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::TransferReceiver);
@@ -213,7 +290,7 @@ void SDFPageScene::CreatePipelines(Target* depth, Target* normals, Target* motio
 		gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Compute, normals, point_sampler);
 		gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Compute, motion, point_sampler);
 		gPSOBuild->AddStorageImage(5, 0, eShaderType::Compute, &lit->GetImage());
-		gPSOBuild->AddBuffer(7, 0, eShaderType::Compute, &mTriangles, 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddBuffer(7, 0, eShaderType::Compute, &mHitRecords, 0, VK_WHOLE_SIZE);
 		gPSOBuild->AddBuffer(8, 0, eShaderType::Compute, &mRefs, 0, VK_WHOLE_SIZE);
 		gPSOBuild->AddBuffer(9, 0, eShaderType::Compute, &mAtlasFirstRef, 0, VK_WHOLE_SIZE);
 		gPSOBuild->AddImage(10, 0, eShaderType::Compute, mpNearest, point_sampler);
@@ -250,6 +327,7 @@ void SDFPageScene::Destroy()
 {
 	mRefs.Destroy();
 	mTriangles.Destroy();
+	mHitRecords.Destroy();
 	mIndirection.Destroy();
 	mJobs.Destroy();
 	mAtlasFirstRef.Destroy();
@@ -269,7 +347,18 @@ bool SDFPageScene::Upload(const CompiledMapSDFPages& pages)
 	CreateBuffer(mRefs, pages.Refs.GetSizeInBytes(), pages.Refs.pData);
 	CreateBuffer(mTriangles, pages.Triangles.GetSizeInBytes(), pages.Triangles.pData);
 
-	const RawGpuBuffer* buffers[] = { &mRefs, &mTriangles };
+	{
+		SizedArray<SDFPageHitRecordGpu> records;
+		records.InitSize(pages.Triangles.Size);
+
+		for (uint32 index = 0; index < pages.Triangles.Size; index++) {
+			records[index] = MakeHitRecord(pages.Triangles[index]);
+		}
+
+		CreateBuffer(mHitRecords, records.GetSizeInBytes(), records.pData);
+	}
+
+	const RawGpuBuffer* buffers[] = { &mRefs, &mTriangles, &mHitRecords };
 
 	gDescriptorCache->RebuildUsing(Slice<const RawGpuBuffer* const>(buffers, std::size(buffers)),
 								   Slice<Image* const>(nullptr, 0));

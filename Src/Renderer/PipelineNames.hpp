@@ -39,16 +39,44 @@ enum class ePipelineName : uint16
 	FogFroxelApply,
 	SDFPageUpdate,
 	SDFPageDebug,
+	/// The probe trace with the bounce (GI_BOUNCE) and without it, then the blend
 	ProbeClipmapTrace,
+	ProbeClipmapTraceNoBounce,
 	ProbeClipmapBlend,
 	ProbeClipmapDebug,
+	/// The GI resolve with and without the screen probes (GI_SCREEN_PROBES) and the history (GI_HISTORY), writing
+	/// GIResolvePasses[0], then the same writing GIResolvePasses[1]. See ProbeClipmapResolvePipeline.
 	ProbeClipmapResolve,
+	ProbeClipmapResolveScreenProbes,
+	ProbeClipmapResolveHistory,
+	ProbeClipmapResolveScreenProbesHistory,
+	ProbeClipmapResolveB,
+	ProbeClipmapResolveScreenProbesB,
+	ProbeClipmapResolveHistoryB,
+	ProbeClipmapResolveScreenProbesHistoryB,
 	ScreenProbeTrace,
+	ScreenProbeFilter,
 
 	NumPipelines
 };
 
 constexpr uint32 scNumPipelines = static_cast<uint32>(ePipelineName::NumPipelines);
+
+/// The GI resolve pipeline that reads the screen probes and the history as given and writes resolve stage `write`
+constexpr ePipelineName ProbeClipmapResolvePipeline(bool screen_probes, bool history, uint32 write)
+{
+	uint32 index = static_cast<uint32>(ePipelineName::ProbeClipmapResolve) + write * 4;
+
+	if (screen_probes) {
+		index += 1;
+	}
+
+	if (history) {
+		index += 2;
+	}
+
+	return static_cast<ePipelineName>(index);
+}
 
 
 struct PipelineNameInfo

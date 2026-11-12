@@ -329,8 +329,8 @@ void GraphicsBackend::RebuildRenderStages()
 	rd->SSAOPass.Rebuild(size);
 	rd->SSAODenoisePass.Rebuild(size);
 	rd->SSAOBlurPass.Rebuild(size);
-	rd->GIResolvePass.Rebuild(size);
-	rd->GIHistoryPass.Rebuild(size);
+	rd->GIResolvePasses[0].Rebuild(size);
+	rd->GIResolvePasses[1].Rebuild(size);
 	mbGIHistoryValid = false;
 	rd->CompPass.Rebuild(size);
 
@@ -999,20 +999,16 @@ struct ProbeClipmapResolveConsts
 {
 	float32 InvViewProjection[16] = {};
 	float32 EyePosition[4] = {};
-	/// Full resolution width and height, flags (scGIResolveFlag*)
+	/// Full resolution width and height
 	uint32 Info[4] = {};
 	float32 PrevEyePosition[4] = {};
-	/// Screen probe tile size
+	/// Screen probe tile size, then the history's width and height
 	uint32 ScreenProbes[4] = {};
 	/// Share of each frame's light in the history
 	float32 Temporal[4] = {};
 };
 
 static_assert(sizeof(ProbeClipmapResolveConsts) == 144);
-
-/// Mirror GI_RESOLVE_FLAG_* in Shaders/ProbeClipmapResolve.hlsl
-constexpr uint32 scGIResolveFlagScreenProbes = 0x01;
-constexpr uint32 scGIResolveFlagHistory = 0x02;
 
 } // namespace
 
@@ -1038,40 +1034,40 @@ void GraphicsBackend::RenderGIResolve(const BaseCamera& camera)
 	consts.PrevEyePosition[0] = mGIPrevEye.X;
 	consts.PrevEyePosition[1] = mGIPrevEye.Y;
 	consts.PrevEyePosition[2] = mGIPrevEye.Z;
+	// This frame writes one resolve stage and reprojects last frame's, the other
+	const uint32 write = 1 - pRenderer->GIResolveIndex;
+	const Image& history_image = pRenderer->GIResolvePasses[1 - write].GetTarget(eImageFormat::RGBA16_Float)->Image;
 	consts.ScreenProbes[0] = ProbeClipmap::scScreenProbeTile;
+	consts.ScreenProbes[1] = history_image.Info.Size.X;
+	consts.ScreenProbes[2] = history_image.Info.Size.Y;
 	consts.Temporal[0] = std::clamp(GIScreenProbeAlpha, 0.01f, 1.0f);
 
 	// The screen probes need this frame's prepass, which the resolve reads too
-	if (bGIScreenProbes && GIClipmap.IsReady()) {
+	const bool use_screen_probes = bGIScreenProbes && GIClipmap.IsReady();
+	const bool use_history = mbGIHistoryValid && bGITemporal;
+
+	if (use_screen_probes) {
 		GIClipmap.TraceScreenProbes(frame->CmdBuffer, camera, UVec2(consts.Info[0], consts.Info[1]));
 		MarkGpu(eGpuMarker::ScreenProbeTrace);
-		consts.Info[2] |= scGIResolveFlagScreenProbes;
 	}
 
-	if (mbGIHistoryValid && bGITemporal) {
-		consts.Info[2] |= scGIResolveFlagHistory;
-	}
+	RenderStage& resolve = pRenderer->GIResolvePasses[write];
 
-	pRenderer->GIResolvePass.Begin(frame->CmdBuffer);
+	resolve.Begin(frame->CmdBuffer);
 
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, GIClipmap.GetForwardDataFrameOffset(GetFrameNumber()));
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->SetFrameData(FrameAlloc.Push(consts));
-	gPipelineCache->Bind(ePipelineName::ProbeClipmapResolve, frame->CmdBuffer);
+	gPipelineCache->Bind(ProbeClipmapResolvePipeline(use_screen_probes, use_history, write), frame->CmdBuffer);
 
 	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
 
-	pRenderer->GIResolvePass.End();
+	resolve.End();
 
-	// What the next frame reprojects
-	RenderStage& resolve = pRenderer->GIResolvePass;
-	RenderStage& history = pRenderer->GIHistoryPass;
-
-	BarrierHelper::ImageCopyAttachmentForSampling(frame->CmdBuffer, &resolve.GetTarget(eImageFormat::RGBA16_Float)->Image,
-												  &history.GetTarget(eImageFormat::RGBA16_Float)->Image);
-	BarrierHelper::ImageCopyAttachmentForSampling(frame->CmdBuffer, &resolve.GetTarget(eImageFormat::RG16_Float)->Image,
-												  &history.GetTarget(eImageFormat::RG16_Float)->Image);
+	// The forward pass reads what was just written, and the next frame reprojects it
+	pRenderer->GIResolveIndex = write;
+	pRenderer->pPersistentDescriptor = pRenderer->PersistentDescriptors[write];
 
 	mGIPrevEye = eye;
 	mbGIHistoryValid = true;
@@ -1391,7 +1387,6 @@ void GraphicsBackend::RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset)
 	gPipelineCache->AddBufferOffset(0, LightBuffer.GetBaseOffset());
 	gPipelineCache->AddBufferOffset(0, GetLightGridFrameOffset());
 	gPipelineCache->AddBufferOffset(0, GetLightIndexListFrameOffset());
-	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, GIClipmap.GetForwardDataFrameOffset(GetFrameNumber()));
 

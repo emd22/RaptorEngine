@@ -16,6 +16,15 @@ bool GIIsFinite(float3 value)
 	return and(!any(isnan(value)), !any(isinf(value)));
 }
 
+/// x^8 as three squarings: pow() with a constant exponent isn't guaranteed to be expanded
+float GIPow8(float x)
+{
+	const float x2 = x * x;
+	const float x4 = x2 * x2;
+
+	return x4 * x4;
+}
+
 /// Irradiance is 8x8 per probe and depth moments 16x16, on every level. Each tile has a one texel border holding the
 /// texels across the octahedral seams.
 #define CLIPMAP_IRRADIANCE_SIZE 8
@@ -74,12 +83,18 @@ uint3 ClipmapSlotCoord(uint slot)
 	return uint3(slot % CLIPMAP_GRID_X, (slot / CLIPMAP_GRID_X) % CLIPMAP_GRID_Y, slot / (CLIPMAP_GRID_X * CLIPMAP_GRID_Y));
 }
 
-uint ClipmapSlot(int3 probe)
+/// A probe coordinate wrapped into its level's toroidal window, the slot's coordinate
+uint3 ClipmapWrap(int3 probe)
 {
-	const uint3 wrapped = uint3(probe & int3(CLIPMAP_GRID_X - 1, CLIPMAP_GRID_Y - 1, CLIPMAP_GRID_Z - 1));
+	return uint3(probe & int3(CLIPMAP_GRID_X - 1, CLIPMAP_GRID_Y - 1, CLIPMAP_GRID_Z - 1));
+}
 
+uint ClipmapSlotFromWrapped(uint3 wrapped)
+{
 	return wrapped.x + wrapped.y * CLIPMAP_GRID_X + wrapped.z * CLIPMAP_GRID_X * CLIPMAP_GRID_Y;
 }
+
+uint ClipmapSlot(int3 probe) { return ClipmapSlotFromWrapped(ClipmapWrap(probe)); }
 
 /// The probe coordinate that slot `slot` holds while the level's window starts at `origin`
 int3 ClipmapSlotProbe(ClipmapLevel level, uint slot)
@@ -160,12 +175,17 @@ uint4 ClipmapEncodeProbe(int3 probe, ClipmapProbe data)
 				 min(data.uiSettle, CLIPMAP_PROBE_MAX_AGE));
 }
 
+/// Which tile of the atlases a level's slot has, by its wrapped coordinate. Both atlases share the layout, so the
+/// texel origin is this times the tile size.
+uint2 ClipmapTileCell(uint level, uint3 wrapped)
+{
+	return uint2(wrapped.x + wrapped.y * CLIPMAP_GRID_X, wrapped.z + level * CLIPMAP_GRID_Z);
+}
+
 /// Where slot `slot` of level `level`'s tile of `tile_size` texels (border included) starts in its atlas
 uint2 ClipmapTileOrigin(uint level, uint slot, uint tile_size)
 {
-	const uint3 coord = ClipmapSlotCoord(slot);
-
-	return uint2(coord.x + coord.y * CLIPMAP_GRID_X, coord.z + level * CLIPMAP_GRID_Z) * tile_size;
+	return ClipmapTileCell(level, ClipmapSlotCoord(slot)) * tile_size;
 }
 
 /// Octahedral map coordinates in [-1, 1] for unit direction `d`, +Y at the centre. Matches ProbeDepthDirectionToOctUV.
@@ -188,14 +208,23 @@ float3 ClipmapOctToDirection(float2 oct)
 	return normalize(float3(xz.x, y, xz.y));
 }
 
+/// ClipmapDirectionToOct() moved to [0, 1], which the atlas lookups take, so a direction shared by every probe of a
+/// gather is encoded once
+float2 ClipmapOctUnit(float3 direction) { return ClipmapDirectionToOct(direction) * 0.5 + 0.5; }
+
+/// Atlas UV of `oct_unit` (see ClipmapOctUnit) in tile `cell` (see ClipmapTileCell), `size` interior texels a side
+float2 ClipmapAtlasUVFromOct(uint2 cell, uint size, float2 oct_unit)
+{
+	const float2 inv_atlas_size = 1.0 / (float2(CLIPMAP_TILE_COLUMNS, CLIPMAP_TILE_ROWS) * float(size + 2));
+	const float2 texel = float2(cell * (size + 2)) + 1.0 + oct_unit * float(size);
+
+	return texel * inv_atlas_size;
+}
+
 /// Atlas UV of `direction` in the tile of a level's slot, `size` interior texels a side
 float2 ClipmapAtlasUV(uint level, uint slot, uint size, float3 direction)
 {
-	const float2 atlas_size = float2(CLIPMAP_TILE_COLUMNS, CLIPMAP_TILE_ROWS) * float(size + 2);
-	const float2 origin = float2(ClipmapTileOrigin(level, slot, size + 2)) + 1.0;
-	const float2 texel = origin + (ClipmapDirectionToOct(direction) * 0.5 + 0.5) * float(size);
-
-	return texel / atlas_size;
+	return ClipmapAtlasUVFromOct(ClipmapTileCell(level, ClipmapSlotCoord(slot)), size, ClipmapOctUnit(direction));
 }
 
 /// The interior texel that border texel (x, y) of a tile with `size` interior texels a side copies, see
@@ -205,15 +234,14 @@ uint2 ClipmapBorderSource(int2 texel, int size)
 	int u = texel.x - 1;
 	int v = texel.y - 1;
 
-	if (u < 0 || u >= size) {
-		u = clamp(u, 0, size - 1);
-		v = size - 1 - v;
-	}
+	// Clamping is a no-op inside the tile, so only the mirror of the other axis needs a select
+	const bool is_outside_u = or(u < 0, u >= size);
+	u = clamp(u, 0, size - 1);
+	v = select(is_outside_u, size - 1 - v, v);
 
-	if (v < 0 || v >= size) {
-		v = clamp(v, 0, size - 1);
-		u = size - 1 - u;
-	}
+	const bool is_outside_v = or(v < 0, v >= size);
+	v = clamp(v, 0, size - 1);
+	u = select(is_outside_v, size - 1 - u, u);
 
 	return uint2(u, v);
 }
@@ -264,9 +292,8 @@ float3 ClipmapRayDirection(uint ray, float3x3 rotation)
 	const float radius = sqrt(saturate(1.0 - z * z));
 	const float phi = float(ray) * golden_angle;
 
-	const float3 direction = float3(radius * cos(phi), z, radius * sin(phi));
-
-	return normalize(mul(direction, rotation));
+	// Unit already: a point on the unit sphere through an orthonormal rotation
+	return mul(float3(radius * cos(phi), z, radius * sin(phi)), rotation);
 }
 
 #endif

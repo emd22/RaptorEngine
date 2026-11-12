@@ -8,8 +8,8 @@
 #define SHADE_FLAG_BAKED_SUN 0x01
 #define SHADE_SHADOW_OFFSET 0.05
 
-/// The triangle nearest the block of texels a hit stopped in
-SDFPageTriangle SDFPageNearestTriangle(SDFPageHit hit, float3 position)
+/// The record of the triangle nearest the block of texels a hit stopped in
+SDFPageHitRecord SDFPageNearestRecord(SDFPageHit hit, float3 position)
 {
 	const SDFPageLevel level = SDF_PAGE_SCENE.Levels[hit.uiLevel];
 	const float3 local = (position - float3(hit.vCoord) * level.vParams.x) * level.vParams.y * SDF_PAGE_TEXELS;
@@ -17,15 +17,7 @@ SDFPageTriangle SDFPageNearestTriangle(SDFPageHit hit, float3 position)
 	const uint3 texel = uint3(SDFPageAtlasOrigin(hit.uiAtlas)) / SDF_PAGE_NEAREST_BLOCK + block;
 	const uint ref = F_SampleLoad(tNearest, int4(texel, 0));
 
-	return bTriangles[bRefs[bAtlasFirstRef[hit.uiAtlas] + ref]];
-}
-
-/// Unit face normal of the triangle, turned to face against `direction`
-float3 SDFPageHitNormal(SDFPageTriangle page_triangle, float3 direction)
-{
-	const float3 face = SDFPageTriangleFace(page_triangle, -direction);
-
-	return select(dot(face, direction) > 0.0, -face, face);
+	return bHitRecords[bRefs[bAtlasFirstRef[hit.uiAtlas] + ref]];
 }
 
 float SDFPageLocalShadow(Light light, float3 position_ws)

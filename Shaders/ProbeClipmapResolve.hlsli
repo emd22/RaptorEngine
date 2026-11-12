@@ -44,6 +44,22 @@ float3 GIResolveDecodeNormal(float2 e)
 	return normalize(float3(xy, z));
 }
 
+/// The normal octahedral, each coordinate as a 16 bit snorm, for the second channel of the resolve's packed target
+uint GIResolvePackNormal(float3 n)
+{
+	const uint2 bits = uint2(int2(round(clamp(GIResolveEncodeNormal(n), -1.0, 1.0) * 32767.0)) & 0xFFFF);
+
+	return bits.x | (bits.y << 16);
+}
+
+float3 GIResolveUnpackNormal(uint packed)
+{
+	// Sign extended from the low and high halves
+	const int2 bits = int2(int(packed << 16) >> 16, int(packed) >> 16);
+
+	return GIResolveDecodeNormal(float2(bits) * (1.0 / 32767.0));
+}
+
 /**
  * The surface's own normal from the positions of the pixel and its neighbours, which the prepass normal (normal mapped)
  * is not. Along each axis it takes the side whose two neighbours line up with the pixel (the smaller error predicting

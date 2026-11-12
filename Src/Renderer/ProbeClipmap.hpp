@@ -92,6 +92,8 @@ public:
 	static constexpr uint32 scScreenProbeTile = 16;
 	static constexpr uint32 scMaxScreenProbes = 65536;
 	static constexpr uint32 scScreenProbeStride = 5;
+	/// float4s per filtered screen probe: its plane and its SH as halves
+	static constexpr uint32 scScreenProbeFilteredStride = 3;
 	static constexpr uint32 scMaxJobsPerFrame = 8192;
 
 	/// One uint4 record per slot, written by the blend: the probe it holds, whether it is filled and switched on, its
@@ -193,9 +195,12 @@ public:
 
 	Image* GetIrradianceImage() { return mpIrradiance; }
 	Image* GetMomentsImage() { return mpMoments; }
+	/// Each probe's mean light for the fog and the particles, see Shaders/ProbeClipmapMean.hlsli
+	Image* GetMeanImage() { return mpMean; }
 	RawGpuBuffer* GetProbeBuffer() { return &mProbes; }
 	RawGpuBuffer* GetForwardDataBuffer() { return &mForwardData; }
-	RawGpuBuffer* GetScreenProbeBuffer() { return &mScreenProbes; }
+	/// The screen probes as the resolve reads them, filtered across their neighbours
+	RawGpuBuffer* GetScreenProbeBuffer() { return &mFilteredScreenProbes; }
 
 	uint32 GetForwardDataFrameOffset(uint32 frame) const { return static_cast<uint32>(frame * scForwardDataFrameSize); }
 
@@ -238,6 +243,9 @@ private:
 	uint32 ScheduleDirtyJobs(uint32 level_index, uint32* jobs, uint32 job_count, uint32 limit);
 
 	void PlaceLevel(uint32 level_index, const FVec3& center);
+	/// Queues the mean texels of the slots a level's window just moved over to be cleared
+	void AddMeanClears(uint32 level_index, const int32* old_origin, const int32* new_origin);
+	void ClearMeans(CommandBuffer& cmd);
 	uint32 ScheduleJobs(uint32* jobs, const Settings& settings);
 	void GetLevelConsts(ProbeClipmapLevelGpu* out_levels, const Settings& settings) const;
 	void InitializeImages(CommandBuffer& cmd);
@@ -249,9 +257,15 @@ private:
 
 	Image* mpIrradiance = nullptr;
 	Image* mpMoments = nullptr;
+	Image* mpMean = nullptr;
+	/// Zeros, copied over the mean texels of slots that now hold another probe, until the blend writes them
+	RawGpuBuffer mMeanZeros;
+	/// The boxes of mean texels to clear before the next update
+	SizedArray<VkBufferImageCopy> mMeanClears;
 	bool mbImagesInitialized = false;
 
 	RawGpuBuffer mJobs;
+	/// Each traced ray's radiance and signed distance, for the blend
 	RawGpuBuffer mRays;
 	/// Per slot: the probe it holds and its state, written by the blend
 	RawGpuBuffer mProbes;
@@ -260,8 +274,9 @@ private:
 	FVec3 mCenter = FVec3::sZero;
 	/// What the forward pass needs to read the probes, see ProbeClipmapForwardData
 	RawGpuBuffer mForwardData;
-	/// Screen probes, see scScreenProbeStride
+	/// Screen probes, see scScreenProbeStride, as traced and as filtered (Shaders/ScreenProbeFilter.hlsl)
 	RawGpuBuffer mScreenProbes;
+	RawGpuBuffer mFilteredScreenProbes;
 
 	CompiledMapProbeMask mMask;
 	/// The mask level each level reads, the one built for its spacing, or -1 where the map has none

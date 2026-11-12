@@ -309,10 +309,16 @@ void DescriptorSet::Build()
 
 	for (const DescriptorEntry& entry : mDescriptorEntries) {
 		if (entry.IsImage()) {
+			VkImageLayout sampled_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			if (entry.pImage->bSampledInGeneral) {
+				sampled_layout = VK_IMAGE_LAYOUT_GENERAL;
+			}
+
 			VkDescriptorImageInfo image_info {
 				.sampler = entry.pSampler->InternalSampler,
 				.imageView = entry.pImage->View,
-				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				.imageLayout = sampled_layout,
 			};
 
 			const VkWriteDescriptorSet image_write {

@@ -382,7 +382,8 @@ private:
 
 	SizedArray<Semaphore> mSubmitSemaphores;
 
-	/// The GI resolve's history: whether GIHistoryPass holds last frame's resolve, and where the eye was for it
+	/// The GI resolve's history: whether the resolve stage not written next holds last frame's resolve, and where the
+	/// eye was for it
 	bool mbGIHistoryValid = false;
 	FVec3 mGIPrevEye = FVec3::sZero;
 

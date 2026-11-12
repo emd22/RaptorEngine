@@ -29,12 +29,14 @@ struct ProbeClipmapConsts
 	uint4 vLights;
 	/// Job count, frame (seeds the ray rotations), flags (CLIPMAP_FLAG_*), proxy count
 	uint4 vInfo;
-	/// Hysteresis, hysteresis where the light changed a lot, how far a probe's short term light is from its stored
-	/// light (relative to the larger) where the faster blend starts, sharpness of the depth moment lobes
+	/// Sharpness of the depth moment lobes times log2(e), the reciprocal of a lobe's expected weight over the rays, how
+	/// far a probe's short term light is from its stored light (relative to the larger) where the faster blend starts
 	float4 vBlend;
-	/// Per level, the power the hystereses are raised to: how many times less often its probes are refreshed than the
-	/// hysteresis is meant for. W is the hysteresis of a fully dirty probe.
-	float4 vLevelRate;
+	/// Per level, the hysteresis, raised to how many times less often its probes are refreshed than it is meant for.
+	/// W is the hysteresis of a fully dirty probe.
+	float4 vSlowHysteresis;
+	/// Per level, the hysteresis where the light changed a lot, raised the same way
+	float4 vFastHysteresis;
 	/// Radiance of the rays that miss
 	float4 vSkyRadiance;
 	/// The moving objects' boxes, which the SDF pages don't hold
@@ -94,7 +96,6 @@ void ClipmapTraceProxy(ClipmapProxy proxy, float3 origin, float3 direction, inou
 	hit.bHit = or(hit.bHit, is_hit);
 }
 
-#define CLIPMAP_FLAG_BOUNCE 0x01
 #define CLIPMAP_FLAG_RELOCATE 0x02
 
 /// Jobs are dispatched as rows of this many groups

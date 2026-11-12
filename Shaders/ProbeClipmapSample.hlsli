@@ -53,11 +53,17 @@ float3 ClipmapSampleIrradiance(uint level, uint slot, float3 direction)
 	return F_SampleLevel(tIrradiance, ClipmapAtlasUV(level, slot, CLIPMAP_IRRADIANCE_SIZE, direction), 0.0).rgb;
 }
 
+/// Irradiance of tile `cell` along a direction encoded by ClipmapOctUnit()
+float3 ClipmapSampleIrradianceOct(uint2 cell, float2 oct_unit)
+{
+	return F_SampleLevel(tIrradiance, ClipmapAtlasUVFromOct(cell, CLIPMAP_IRRADIANCE_SIZE, oct_unit), 0.0).rgb;
+}
+
 /// The mean distance and the mean squared distance. Bilinear filtering them keeps the spread between texels in the
 /// variance, which softens the visibility at occluder edges.
-float2 ClipmapSampleMoments(uint level, uint slot, float3 direction)
+float2 ClipmapSampleMomentsOct(uint2 cell, float2 oct_unit)
 {
-	return F_SampleLevel(tMoments, ClipmapAtlasUV(level, slot, CLIPMAP_MOMENTS_SIZE, direction), 0.0).rg;
+	return F_SampleLevel(tMoments, ClipmapAtlasUVFromOct(cell, CLIPMAP_MOMENTS_SIZE, oct_unit), 0.0).rg;
 }
 
 /// Chebyshev's bound on the visibility of a receiver `distance` away, with a variance floor of the angle one depth
@@ -145,6 +151,11 @@ ClipmapGatherResult ClipmapGatherLevel(uint level, float3 position, float3 bias,
 	const float3 local = biased * clip.vParams.y;
 	const float3 base = floor(local);
 	const float3 cell_frac = local - base;
+	const uint3 base_wrapped = ClipmapWrap(int3(base));
+
+	// The same for all eight probes
+	const float2 diffuse_oct = ClipmapOctUnit(diffuse_normal);
+	const float2 reflected_oct = ClipmapOctUnit(reflected);
 
 	float3 diffuse = float3(0.0, 0.0, 0.0);
 	float3 specular = float3(0.0, 0.0, 0.0);
@@ -155,7 +166,9 @@ ClipmapGatherResult ClipmapGatherLevel(uint level, float3 position, float3 bias,
 	for (uint corner = 0; corner < 8; corner++) {
 		const int3 offset = int3(corner, corner >> 1, corner >> 2) & 1;
 		const int3 probe = int3(base) + offset;
-		const uint slot = ClipmapSlot(probe);
+		const uint3 wrapped = ClipmapWrap(int3(base_wrapped) + offset);
+		const uint slot = ClipmapSlotFromWrapped(wrapped);
+		const uint2 cell = ClipmapTileCell(level, wrapped);
 		const ClipmapProbe data = ClipmapDecodeProbe(bProbes[ClipmapProbeIndex(level, slot)], probe);
 
 		const float3 axis = lerp(1.0 - cell_frac, cell_frac, float3(offset));
@@ -167,7 +180,7 @@ ClipmapGatherResult ClipmapGatherLevel(uint level, float3 position, float3 bias,
 		const float distance = length(to_receiver);
 		const float3 direction = to_receiver / max(distance, 1e-4);
 
-		const float2 depth = ClipmapSampleMoments(level, slot, direction);
+		const float2 depth = ClipmapSampleMomentsOct(cell, ClipmapOctUnit(direction));
 		const float visibility = select(distance < 1e-4, 1.0, ClipmapChebyshev(distance, depth));
 		visibility_sum += visibility * valid_trilinear;
 
@@ -180,10 +193,10 @@ ClipmapGatherResult ClipmapGatherLevel(uint level, float3 position, float3 bias,
 		weight *= select(data.bActive, 1.0, CLIPMAP_INACTIVE_WEIGHT);
 		weight *= valid_trilinear;
 
-		diffuse += ClipmapSampleIrradiance(level, slot, diffuse_normal) * weight;
+		diffuse += ClipmapSampleIrradianceOct(cell, diffuse_oct) * weight;
 
 		if (with_specular) {
-			specular += ClipmapSampleIrradiance(level, slot, reflected) * weight;
+			specular += ClipmapSampleIrradianceOct(cell, reflected_oct) * weight;
 		}
 
 		total += weight;
@@ -298,6 +311,8 @@ float3 ClipmapGatherBounce(float3 position, float3 normal, float3 view_direction
 	float coarser_share;
 	uint level = ClipmapFindLevel(position, bias, found, coarser_share);
 
+	const float2 normal_oct = ClipmapOctUnit(normal);
+
 	float3 diffuse = float3(0.0, 0.0, 0.0);
 	float total = 0.0;
 
@@ -307,6 +322,7 @@ float3 ClipmapGatherBounce(float3 position, float3 normal, float3 view_direction
 		const float3 local = (position + bias * clip.vParams.x) * clip.vParams.y;
 		const float3 base = floor(local);
 		const float3 cell_frac = local - base;
+		const uint3 base_wrapped = ClipmapWrap(int3(base));
 
 		diffuse = float3(0.0, 0.0, 0.0);
 		total = 0.0;
@@ -314,7 +330,8 @@ float3 ClipmapGatherBounce(float3 position, float3 normal, float3 view_direction
 		for (uint corner = 0; corner < 8; corner++) {
 			const int3 offset = int3(corner, corner >> 1, corner >> 2) & 1;
 			const int3 probe = int3(base) + offset;
-			const uint slot = ClipmapSlot(probe);
+			const uint3 wrapped = ClipmapWrap(int3(base_wrapped) + offset);
+			const uint slot = ClipmapSlotFromWrapped(wrapped);
 			const ClipmapProbe data = ClipmapDecodeProbe(bProbes[ClipmapProbeIndex(level, slot)], probe);
 
 			const float3 axis = lerp(1.0 - cell_frac, cell_frac, float3(offset));
@@ -324,7 +341,7 @@ float3 ClipmapGatherBounce(float3 position, float3 normal, float3 view_direction
 			weight *= select(data.bActive, 1.0, CLIPMAP_INACTIVE_WEIGHT);
 			weight = select(data.bReady, weight, 0.0);
 
-			diffuse += ClipmapSampleIrradiance(level, slot, normal) * weight;
+			diffuse += ClipmapSampleIrradianceOct(ClipmapTileCell(level, wrapped), normal_oct) * weight;
 			total += weight;
 		}
 

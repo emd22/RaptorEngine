@@ -31,7 +31,7 @@ F_Texture2D(tMotion, 4, 0);
 
 [[vk::image_format("rgba16f")]] [[vk::binding(5, 0)]] RWTexture2D<float4> tOutput;
 
-F_StructBuffer(bTriangles, SDFPageTriangle, 7, 0);
+F_StructBuffer(bHitRecords, SDFPageHitRecord, 7, 0);
 F_StructBuffer(bRefs, uint, 8, 0);
 F_StructBuffer(bAtlasFirstRef, uint, 9, 0);
 Texture3D<uint> tNearestTexture : register(t10, space0);
@@ -199,12 +199,12 @@ float3 ShadePixel(uint2 pixel, uint2 group, uint2 local)
 
 				if (hit.bHit) {
 					const float3 position = origin + direction * hit.fDistance;
-					const SDFPageTriangle page_triangle = SDFPageNearestTriangle(hit, position);
-					const float3 face = SDFPageTriangleFace(page_triangle, float3(0.0, 1.0, 0.0));
+					const SDFPageHitRecord record = SDFPageNearestRecord(hit, position);
+					const float3 face = SDFPageRecordFace(record, float3(0.0, 1.0, 0.0));
 					const float3 hit_normal = select(dot(face, direction) > 0.0, -face, face);
 
 					const float angle = float(Hash(seed ^ 0x68E31DA4u) & 0xFFFFu) * (2.0 * PI / 65536.0);
-					radiance = SDFPageShadeHit(position, hit_normal, SDFPageTriangleAlbedo(page_triangle),
+					radiance = SDFPageShadeHit(position, hit_normal, SDFPageRecordAlbedo(record),
 											   float2(cos(angle), sin(angle)), Consts.BakedSun, Consts.vLightIndices,
 											   Consts.vLights.x, Consts.vLights.y);
 				}
@@ -234,9 +234,9 @@ float3 ShadePixel(uint2 pixel, uint2 group, uint2 local)
 				colour = SDFPageNormal(position, texel) * 0.5 + 0.5;
 			}
 			else if (view == VIEW_HIT_TRIANGLE) {
-				const SDFPageTriangle page_triangle = SDFPageNearestTriangle(hit, position);
-				const float3 face = cross(page_triangle.vB.xyz - page_triangle.vA.xyz, page_triangle.vC.xyz - page_triangle.vA.xyz);
-				const float3 albedo = SDFPageTriangleAlbedo(page_triangle);
+				const SDFPageHitRecord record = SDFPageNearestRecord(hit, position);
+				const float3 face = SDFPageRecordFace(record, float3(0.0, 0.0, 0.0));
+				const float3 albedo = SDFPageRecordAlbedo(record);
 				const bool is_backface = dot(face, view_direction) > 0.0;
 				const bool is_black = all(albedo < 1e-3);
 

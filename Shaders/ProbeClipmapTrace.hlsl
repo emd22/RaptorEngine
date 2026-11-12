@@ -9,7 +9,7 @@ F_PROGRAM(FPT_COMPUTE)
 
 F_StructBuffer(bSDFPageIndirection, uint, 0, 0);
 F_Texture3D(tSDFPageAtlas, 1, 0);
-F_StructBuffer(bTriangles, SDFPageTriangle, 2, 0);
+F_StructBuffer(bHitRecords, SDFPageHitRecord, 2, 0);
 F_StructBuffer(bRefs, uint, 3, 0);
 F_StructBuffer(bAtlasFirstRef, uint, 4, 0);
 Texture3D<uint> tNearestTexture : register(t5, space0);
@@ -79,16 +79,18 @@ void main(uint3 group : SV_GroupID, uint ray : SV_GroupIndex)
 	float3 page_albedo = float3(0.0, 0.0, 0.0);
 
 	if (hit.bHit) {
-		const SDFPageTriangle page_triangle = SDFPageNearestTriangle(hit, origin + direction * hit.fDistance);
+		const SDFPageHitRecord record = SDFPageNearestRecord(hit, origin + direction * hit.fDistance);
 
-		page_face = SDFPageTriangleFace(page_triangle, -direction);
-		page_albedo = SDFPageTriangleAlbedo(page_triangle);
+		page_face = SDFPageRecordFace(record, -direction);
+		page_albedo = SDFPageRecordAlbedo(record);
 
 		const float texel = Consts.SDFPages.Levels[hit.uiLevel].vParams.w;
 		const float facing = dot(direction, page_face);
 		const float abs_facing = max(abs(facing), 0.05);
-		const float plane_distance = dot(page_triangle.vA.xyz - origin, page_face) / select(facing < 0.0, -abs_facing,
-																							   abs_facing);
+		// The plane through the triangle, or for one without a face, through the hit across the ray
+		const float plane = select((record.uiAlbedo & SDF_PAGE_RECORD_HAS_FACE) != 0u, record.fPlane,
+								   dot(origin + direction * hit.fDistance, page_face));
+		const float plane_distance = (plane - dot(origin, page_face)) / select(facing < 0.0, -abs_facing, abs_facing);
 		// Capped, so a triangle that isn't the one the ray was heading for can't carry it far
 		const float reach = min(texel * (SDF_PAGE_HIT_TEXELS + 1.0) / abs_facing, texel * 8.0);
 
@@ -134,11 +136,11 @@ void main(uint3 group : SV_GroupID, uint ray : SV_GroupIndex)
 			radiance = SDFPageShadeHit(position, normal, albedo, float2(cos(angle), sin(angle)), Consts.BakedSun,
 									   Consts.vLightIndices, Consts.vLights.x, Consts.vLights.y);
 
+PERMIF(GI_BOUNCE);
 			// The light that bounced before reaching the hit, from last frame's probes
-			if (HAS_FLAG(Consts.vInfo.z, CLIPMAP_FLAG_BOUNCE)) {
-				const float3 bounced = ClipmapGatherBounce(position, normal, -direction);
-				radiance += select(bounced.x >= 0.0, albedo * bounced, float3(0.0, 0.0, 0.0));
-			}
+			const float3 bounced = ClipmapGatherBounce(position, normal, -direction);
+			radiance += select(bounced.x >= 0.0, albedo * bounced, float3(0.0, 0.0, 0.0));
+PERMEND();
 		}
 
 		// A box in front of the page hit is where the ray ends, otherwise the depth carried on to the plane

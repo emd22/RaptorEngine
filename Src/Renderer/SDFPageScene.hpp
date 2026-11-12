@@ -32,6 +32,22 @@ struct SDFPageLevelGpu
 	float32 Params[4] = {};
 };
 
+/// What a ray's hit needs of a triangle. Laid out to match SDFPageHitRecord in Shaders/SDFPageCommon.hlsli.
+struct SDFPageHitRecordGpu
+{
+	/// Unit face normal, octahedral (Z at the centre), as two 16 bit snorms
+	uint32 Normal = 0;
+	/// dot(normal, the triangle's corners)
+	float32 Plane = 0.0f;
+	/// Linear albedo as RGB8, and scHasFace in bit 24
+	uint32 Albedo = 0;
+	uint32 Padding = 0;
+
+	static constexpr uint32 scHasFace = 0x01000000u;
+};
+
+static_assert(sizeof(SDFPageHitRecordGpu) == 16);
+
 /// Laid out to match SDFPageScene in Shaders/SDFPageCommon.hlsli
 struct SDFPageSceneGpu
 {
@@ -156,6 +172,8 @@ public:
 
 	RawGpuBuffer* GetIndirectionBuffer() { return &mIndirection; }
 	RawGpuBuffer* GetTriangleBuffer() { return &mTriangles; }
+	/// One SDFPageHitRecordGpu per triangle, what the traces read at a hit
+	RawGpuBuffer* GetHitRecordBuffer() { return &mHitRecords; }
 	RawGpuBuffer* GetRefBuffer() { return &mRefs; }
 	RawGpuBuffer* GetAtlasFirstRefBuffer() { return &mAtlasFirstRef; }
 	Image* GetAtlas() { return mpAtlas; }
@@ -215,6 +233,7 @@ private:
 private:
 	RawGpuBuffer mRefs;
 	RawGpuBuffer mTriangles;
+	RawGpuBuffer mHitRecords;
 	RawGpuBuffer mIndirection;
 	RawGpuBuffer mJobs;
 

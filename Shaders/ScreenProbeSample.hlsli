@@ -3,17 +3,16 @@
 
 #include "ScreenProbeCommon.hlsli"
 
-// Reads the screen probes around a pixel. Needs bScreenProbes (StructuredBuffer<float4>) declared by the including
-// shader.
+// Reads the screen probes around a pixel, as ScreenProbeFilter.hlsl leaves them. Needs bScreenProbes
+// (StructuredBuffer<float4>) declared by the including shader.
 
-/// A screen probe stands for a pixel within this share of the pixel's distance from the eye of its plane
-#define SCREEN_PROBE_PLANE_SHARE 0.02
 /// Below this much probe weight a pixel takes the clipmap's light, blending over to it from SCREEN_PROBE_FULL_WEIGHT
 #define SCREEN_PROBE_MIN_WEIGHT 0.05
 #define SCREEN_PROBE_FULL_WEIGHT 0.2
-/// 0: the 2x2 probes around the pixel, bilinear. 1: 4x4, a tent twice as wide, which also filters between probes.
+/// 0: the 2x2 probes around the pixel, bilinear, which on the filtered probes is a 4x4 tent. 1: 4x4, a tent twice as
+/// wide.
 #ifndef SCREEN_PROBE_FILTER_RADIUS
-#define SCREEN_PROBE_FILTER_RADIUS 1
+#define SCREEN_PROBE_FILTER_RADIUS 0
 #endif
 
 /**
@@ -35,30 +34,28 @@ float3 ScreenProbeGather(float3 surface, float surface_distance, float3 geometri
 	for (uint corner = 0; corner < uint(span * span); corner++) {
 		const int2 offset = int2(int(corner) % span, int(corner) / span) - SCREEN_PROBE_FILTER_RADIUS;
 		const int2 tile = clamp(base + offset, int2(0, 0), tiles - 1);
-		const uint index = uint(tile.x + tile.y * tiles.x) * SCREEN_PROBE_STRIDE;
+		const uint index = uint(tile.x + tile.y * tiles.x) * SCREEN_PROBE_FILTERED_STRIDE;
 
-		const float4 probe_position = bScreenProbes[index];
-		const float3 probe_normal = bScreenProbes[index + 1].xyz;
+		const float4 plane = bScreenProbes[index];
+		const uint4 sh_rg = asuint(bScreenProbes[index + 1]);
+		const uint2 sh_b_bits = asuint(bScreenProbes[index + 2]).xy;
 
 		const float2 tent_distance = abs(float2(offset) - frac_xy) / float(SCREEN_PROBE_FILTER_RADIUS + 1);
 		const float2 axis = saturate(1.0 - tent_distance);
-		const float plane = abs(dot(surface - probe_position.xyz, probe_normal));
-		const float plane_weight = saturate(1.0 - plane / (surface_distance * SCREEN_PROBE_PLANE_SHARE + 0.01));
-		const float normal_weight = pow(saturate(dot(geometric_normal, probe_normal)), 8.0);
-		const float4 sh_r = bScreenProbes[index + 2];
-		const float4 sh_g = bScreenProbes[index + 3];
-		const float4 sh_b = bScreenProbes[index + 4];
+		const float plane_distance = abs(dot(surface, plane.xyz) - plane.w);
+		const float plane_weight = saturate(1.0 - plane_distance / (surface_distance * SCREEN_PROBE_PLANE_SHARE + 0.01));
+		const float normal_weight = GIPow8(saturate(dot(geometric_normal, plane.xyz)));
+		const float4 sh_r = ScreenProbeUnpackHalf4(sh_rg.xy);
+		const float4 sh_g = ScreenProbeUnpackHalf4(sh_rg.zw);
+		const float4 sh_b = ScreenProbeUnpackHalf4(sh_b_bits);
 		const float3 irradiance = float3(ScreenProbeIrradiance(sh_r, normal), ScreenProbeIrradiance(sh_g, normal),
 										 ScreenProbeIrradiance(sh_b, normal));
 
-		// The coefficients are checked, not the irradiance: max(NaN, 0) is 0 on some GPUs, which would pass a broken
-		// probe as one with a black channel. Selected, not multiplied away: 0 * NaN is NaN.
-		const bool is_finite = and(and(GIIsFinite(sh_r.xyz), GIIsFinite(sh_g.xyz)),
-								   and(GIIsFinite(sh_b.xyz), GIIsFinite(float3(sh_r.w, sh_g.w, sh_b.w))));
-		const bool is_usable = and(and(probe_position.w > 0.0, GIIsFinite(probe_position.xyz)), is_finite);
-		const float weight = select(is_usable, axis.x * axis.y * plane_weight * normal_weight, 0.0);
+		// ScreenProbeTrace only writes finite probes (a broken one as unplaced, with zero coefficients), so nothing
+		// here can be NaN. An unplaced probe's plane is zero, so is its normal weight.
+		const float weight = axis.x * axis.y * plane_weight * normal_weight;
 
-		sum += select(weight > 0.0, irradiance * weight, float3(0.0, 0.0, 0.0));
+		sum += irradiance * weight;
 		total += weight;
 	}
 

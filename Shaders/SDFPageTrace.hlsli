@@ -73,10 +73,14 @@ float SDFPageDistance(float3 position)
 	const bool found = SDFPageFind(position, 0, level, coord, atlas);
 	const bool is_empty = or(!found, atlas == SDF_PAGE_EMPTY);
 
-	const float margin = SDF_PAGE_SCENE.Levels[level].vParams.z;
-	const float distance = SDFPageSampleDistance(level, coord, select(is_empty, 0u, atlas), position);
+	// A branch rather than a select: it skips the atlas sample for an empty page
+	float distance = SDF_PAGE_SCENE.Levels[level].vParams.z;
 
-	return select(is_empty, margin, distance);
+	if (!is_empty) {
+		distance = SDFPageSampleDistance(level, coord, atlas, position);
+	}
+
+	return distance;
 }
 
 float3 SDFPageNormal(float3 position, float texel)
@@ -186,7 +190,13 @@ SDFPageHit SDFPageTrace(float3 origin, float3 direction, float max_distance, flo
 		const float exit_distance = max(min(to_exit.x, min(to_exit.y, to_exit.z)), 0.0) +
 									sdf_page_level.vParams.w * SDF_PAGE_EXIT_EPSILON;
 
-		const float distance = SDFPageSampleDistance(level, coord, select(is_empty, 0u, atlas), position);
+		// A branch rather than a select: most steps in open space are in empty pages, and their lanes skip the atlas
+		// sample this way, even in a divergent wave
+		float distance = exit_distance;
+
+		if (!is_empty) {
+			distance = SDFPageSampleDistance(level, coord, atlas, position);
+		}
 
 		if (and(!is_empty, distance < sdf_page_level.vParams.w * SDF_PAGE_HIT_TEXELS)) {
 			hit.fDistance = t;
@@ -197,7 +207,7 @@ SDFPageHit SDFPageTrace(float3 origin, float3 direction, float max_distance, flo
 			break;
 		}
 
-		t += select(is_empty, exit_distance, distance);
+		t += distance;
 
 		// Written so that a NaN distance stops the ray too
 		if (!(t < max_distance)) {
@@ -244,8 +254,11 @@ SDFPageHit SDFPageRefineHit(SDFPageHit hit, float3 origin, float3 direction, flo
 
 		// Nothing is within an empty page's margin of any point in it
 		const bool is_empty = atlas == SDF_PAGE_EMPTY;
-		const float distance = select(is_empty, sdf_page_level.vParams.z,
-									  SDFPageSampleDistance(level, coord, select(is_empty, 0u, atlas), position));
+		float distance = sdf_page_level.vParams.z;
+
+		if (!is_empty) {
+			distance = SDFPageSampleDistance(level, coord, atlas, position);
+		}
 
 		if (and(!is_empty, distance < sdf_page_level.vParams.w * SDF_PAGE_HIT_TEXELS)) {
 			if (level < hit.uiLevel) {

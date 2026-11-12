@@ -243,13 +243,15 @@ void ParticleSystem::BuildDescriptorSet(Image* atlas)
 	entries.Insert(
 		DescriptorEntry::AsImage(2, eShaderType::Pixel, &depth->GetImage(), gSamplerCache->Request(depth_sampler)));
 
-	// Lit particles take the light around them from the GI probes
+	// Lit particles take the light around them from the GI probes' means. The sampler repeats, as the probe slots wrap.
 	ProbeClipmap& clipmap = gGraphics->GIClipmap;
 
-	entries.Insert(DescriptorEntry::AsImage(3, eShaderType::Vertex, clipmap.GetIrradianceImage(),
-											gSamplerCache->Request(atlas_sampler)));
-	entries.Insert(
-		DescriptorEntry::AsBuffer(6, eShaderType::Vertex, clipmap.GetProbeBuffer(), 0, ProbeClipmap::scProbesSize));
+	SamplerProps mean_sampler {};
+	mean_sampler.SetLinear();
+	mean_sampler.AddressMode = eSamplerAddressMode::Repeat;
+
+	entries.Insert(DescriptorEntry::AsImage(3, eShaderType::Vertex, clipmap.GetMeanImage(),
+											gSamplerCache->Request(mean_sampler)));
 	entries.Insert(DescriptorEntry::AsBuffer(7, eShaderType::Vertex, clipmap.GetForwardDataBuffer(), 0,
 											 ProbeClipmap::scForwardDataFrameSize));
 
@@ -1063,7 +1065,6 @@ void ParticleSystem::Render(renderer::CommandBuffer& cmd, const BaseCamera& came
 
 	const uint32 buffer_offsets[] = {
 		base_offset,
-		0,
 		gGraphics->GIClipmap.GetForwardDataFrameOffset(gGraphics->GetFrameNumber()),
 	};
 

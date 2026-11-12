@@ -90,6 +90,7 @@ enum class eImageFormat : uint16
 	RG16_Float,
 
 	R16_UInt,
+	RG32_UInt,
 };
 
 enum class eImageType
@@ -279,6 +280,9 @@ struct ImageFormatUtil
 		case eImageFormat::R16_UInt:
 			return 2;
 
+		case eImageFormat::RG32_UInt:
+			return 8;
+
 		case eImageFormat::BC7_UNorm:
 		case eImageFormat::BC7_SRGB:
 			break;
@@ -395,6 +399,8 @@ struct ImageFormatUtil
 			return VK_FORMAT_R8_UNORM;
 		case eImageFormat::R16_UInt:
 			return VK_FORMAT_R16_UINT;
+		case eImageFormat::RG32_UInt:
+			return VK_FORMAT_R32G32_UINT;
 
 		case eImageFormat::BC7_UNorm:
 			return VK_FORMAT_BC7_UNORM_BLOCK;
@@ -490,6 +496,9 @@ public:
 	VkImageView View = nullptr;
 
 	VkImageLayout ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	/// Kept in VK_IMAGE_LAYOUT_GENERAL for good, so sampled descriptors of it declare that layout. For a storage image
+	/// that is written and sampled every frame, which then needs no layout transitions.
+	bool bSampledInGeneral = false;
 	VmaAllocation Allocation = nullptr;
 
 	ImageInfo Info {};
