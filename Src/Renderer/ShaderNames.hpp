@@ -32,6 +32,7 @@ enum class eShaderName : uint32
 	ProbeClipmapResolve,
 	ScreenProbeTrace,
 	ScreenProbeFilter,
+	ScreenProbeLitHistory,
 
 	NumShaders,
 };
@@ -68,6 +69,7 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(ProbeClipmapResolve);
 		FX_ENUM_CASE_NAME(ScreenProbeTrace);
 		FX_ENUM_CASE_NAME(ScreenProbeFilter);
+		FX_ENUM_CASE_NAME(ScreenProbeLitHistory);
 	default:
 		return "Unknown";
 	}

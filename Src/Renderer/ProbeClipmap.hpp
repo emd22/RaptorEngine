@@ -148,7 +148,7 @@ public:
 public:
 	void Create();
 	void Destroy();
-	void CreatePipelines(Target* depth, Target* normals, Target* lit);
+	void CreatePipelines(Target* depth, Target* normals, Target* lit, Target* motion, Target* lit_history);
 
 	/// Forgets every probe, for a new map
 	void Reset();
@@ -185,12 +185,23 @@ public:
 	 */
 	void TraceScreenProbes(CommandBuffer& cmd, const BaseCamera& camera, UVec2 extent);
 
+	/**
+	 * Keeps the lit target, as the forward pass left it, at half resolution in `lit_history` for the next frame's screen
+	 * probes, whose rays take the light of the surfaces they reach on screen from it.
+	 */
+	void CaptureLitHistory(CommandBuffer& cmd, const BaseCamera& camera, Image* lit_history);
+
+	/// Forgets the lit history, so the next screen probes trace the SDF pages alone
+	void InvalidateLitHistory() { mbLitHistoryValid = false; }
+
 	bool IsReady() const { return mbImagesInitialized; }
 
 	/// Screen probe settings: metres traced through the SDF pages before the clipmap is read, the cone slope, and how
 	/// many times the trace is dispatched (for timing)
 	float32 ScreenProbeRayLength = 2.0f;
 	float32 ScreenProbeCone = 0.0f;
+	/// Whether screen probe rays go through last frame's lit scene before the SDF pages
+	bool bScreenProbeScreenTrace = true;
 	uint32 ScreenProbeRepeat = 1;
 
 	Image* GetIrradianceImage() { return mpIrradiance; }
@@ -277,6 +288,11 @@ private:
 	/// Screen probes, see scScreenProbeStride, as traced and as filtered (Shaders/ScreenProbeFilter.hlsl)
 	RawGpuBuffer mScreenProbes;
 	RawGpuBuffer mFilteredScreenProbes;
+
+	/// Whether the lit history holds last frame's lit scene, where the eye was, and its size
+	bool mbLitHistoryValid = false;
+	FVec3 mLitHistoryEye = FVec3::sZero;
+	UVec2 mLitHistorySize = UVec2(0, 0);
 
 	CompiledMapProbeMask mMask;
 	/// The mask level each level reads, the one built for its spacing, or -1 where the map has none

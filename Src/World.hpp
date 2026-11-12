@@ -236,6 +236,7 @@ public:
 	CVarValue* pCVarScreenProbes = nullptr;
 	CVarValue* pCVarGITemporal = nullptr;
 	CVarValue* pCVarSPAlpha = nullptr;
+	CVarValue* pCVarSPScreenTrace = nullptr;
 	CVarValue* pCVarGIProbeBudget = nullptr;
 	CVarValue* pCVarGIHysteresis = nullptr;
 	CVarValue* pCVarGIBounce = nullptr;

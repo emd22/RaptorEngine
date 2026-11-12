@@ -54,8 +54,12 @@ enum class ePipelineName : uint16
 	ProbeClipmapResolveScreenProbesB,
 	ProbeClipmapResolveHistoryB,
 	ProbeClipmapResolveScreenProbesHistoryB,
+	/// The screen probe trace through the SDF pages alone, and first through last frame's lit scene
+	/// (SCREEN_PROBE_SCREEN_TRACE)
 	ScreenProbeTrace,
+	ScreenProbeTraceScreen,
 	ScreenProbeFilter,
+	ScreenProbeLitHistory,
 
 	NumPipelines
 };

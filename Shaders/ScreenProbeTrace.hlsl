@@ -35,6 +35,11 @@ F_StructBuffer(bProbes, uint4, 19, 0);
 
 F_Texture2D(tDepth, 20, 0);
 F_Texture2D(tNormal, 21, 0);
+/// Prepass motion: last frame's uv minus this frame's
+F_Texture2D(tMotion, 23, 0);
+/// Last frame's lit scene at half resolution: radiance, and the distance from last frame's eye (see
+/// ScreenProbeLitHistory.hlsl)
+F_Texture2D(tLitHistory, 24, 0);
 F_RWStructBuffer(bScreenProbes, float4, 22, 0);
 
 struct ScreenProbeTraceConsts
@@ -46,6 +51,11 @@ struct ScreenProbeTraceConsts
 	uint4 vScreen;
 	/// Ray length through the SDF pages before the clipmap is read, cone slope, frame
 	float4 vParams;
+	float4x4 mViewProjection;
+	/// Where the eye was for last frame's lit scene
+	float4 vPrevEyePosition;
+	/// Its width and height
+	uint4 vLitHistory;
 };
 
 F_FrameData(ScreenProbeTraceConsts, Consts, 1);
@@ -63,6 +73,23 @@ F_FrameData(ScreenProbeTraceConsts, Consts, 1);
 groupshared float4 sRadiance[SCREEN_PROBE_RAYS];
 /// The probe: position (W 1 where placed), normal, where its rays start, and the tangent frame its directions are in
 groupshared float4 sPlacement[5];
+/// Per wave, how many of its rays trace the SDF pages; those rays, packed; and what they bring back, by ray
+groupshared uint sWaveCounts[SCREEN_PROBE_RAYS / 4];
+groupshared uint sSDFRays[SCREEN_PROBE_RAYS];
+/// Marks a packed ray the screen showed clear to its end
+#define SCREEN_PROBE_CLEAR_BIT 0x80000000u
+groupshared float4 sSDFRadiance[SCREEN_PROBE_RAYS];
+
+/// Steps a ray takes through the depth buffer, closer together near its start
+#define SCREEN_PROBE_SCREEN_STEPS 16
+/// A ray is on a surface once it is behind it by less than this share of its distance from the eye (at least
+/// SCREEN_PROBE_MIN_THICKNESS metres) plus its last step
+#define SCREEN_PROBE_THICKNESS_SHARE 0.02
+#define SCREEN_PROBE_MIN_THICKNESS 0.05
+/// A texel of last frame's lit scene is the surface hit when its distance from last frame's eye is within this share
+/// of the expected (plus SCREEN_PROBE_HISTORY_DEPTH_BIAS metres)
+#define SCREEN_PROBE_HISTORY_DEPTH_SHARE 0.03
+#define SCREEN_PROBE_HISTORY_DEPTH_BIAS 0.05
 
 float3 ScreenWorldPosition(int2 pixel)
 {
@@ -143,6 +170,201 @@ void PlaceScreenProbe(uint lane, int2 tile_origin, uint tile_size)
 	}
 }
 
+/// What a ray's way through the depth buffer showed, see ScreenProbeTraceScreen
+#define SCREEN_TRACE_UNKNOWN 0u
+#define SCREEN_TRACE_HIT 1u
+#define SCREEN_TRACE_CLEAR 2u
+
+/**
+ * Follows a ray through this frame's depth buffer. SCREEN_TRACE_HIT where it ends on a surface that faces it and that
+ * last frame's lit scene shows at the same distance, with that surface's radiance. SCREEN_TRACE_CLEAR where it stays on
+ * screen and in front of everything to its end: nothing visible is in its way, and nothing hidden can be, so it only
+ * needs the light arriving at its end. SCREEN_TRACE_UNKNOWN where it leaves the screen, passes behind something, or
+ * the surface it reaches wasn't in view last frame: the SDF pages are traced for those.
+ */
+uint ScreenProbeTraceScreen(float3 origin, float3 direction, float ray_length, float jitter, out float3 out_radiance)
+{
+	out_radiance = float3(0.0, 0.0, 0.0);
+
+	const float3 eye = Consts.vEyePosition.xyz;
+	const float2 screen = float2(Consts.vScreen.xy);
+
+	bool is_hit = false;
+	bool is_clear = true;
+	int2 hit_pixel = int2(0, 0);
+	float3 hit_position = float3(0.0, 0.0, 0.0);
+	float previous_t = 0.0;
+
+	[loop]
+	for (uint step = 0; step < SCREEN_PROBE_SCREEN_STEPS; step++) {
+		// The last step lands on the ray's end
+		const float x = min((float(step) + jitter) / float(SCREEN_PROBE_SCREEN_STEPS - 1), 1.0);
+		const float t = ray_length * x * x;
+		const float3 position = origin + direction * t;
+
+		const float4 clip = mul(float4(position, 1.0), Consts.mViewProjection);
+		const float2 uv = clip.xy / clip.w * 0.5 + 0.5;
+
+		if (or(clip.w <= 0.0, any(saturate(uv) != uv))) {
+			is_clear = false;
+			break;
+		}
+
+		const int2 pixel = min(int2(uv * screen), int2(screen) - 1);
+		const float stored_depth = F_SampleLoad(tDepth, int3(pixel, 0)).r;
+
+		// Nothing is known behind the viewmodel
+		if (stored_depth >= VIEWMODEL_STORED_DEPTH) {
+			is_clear = false;
+			break;
+		}
+
+		const float3 surface = ScreenWorldPosition(pixel);
+		const float ray_distance = length(position - eye);
+		// The sky is never hit
+		const float surface_distance = select(stored_depth > 0.0, length(surface - eye), 1e30);
+		const float behind = ray_distance - surface_distance;
+
+		if (behind > 0.0) {
+			// Further behind, the ray went behind something, which says nothing about what it reaches
+			const float thickness = max(ray_distance * SCREEN_PROBE_THICKNESS_SHARE, SCREEN_PROBE_MIN_THICKNESS) +
+									(t - previous_t);
+			is_hit = behind < thickness;
+			is_clear = false;
+			hit_pixel = pixel;
+			hit_position = surface;
+			break;
+		}
+
+		previous_t = t;
+	}
+
+	// An early out that skips the loads below
+	if (!is_hit) {
+		return select(is_clear, SCREEN_TRACE_CLEAR, SCREEN_TRACE_UNKNOWN);
+	}
+
+	// A surface the ray reaches from behind is the inside of something
+	const float3 surface_normal = F_SampleLoad(tNormal, int3(hit_pixel, 0)).xyz;
+	const bool faces_ray = dot(surface_normal, direction) < 0.0;
+
+	// Where the surface was last frame, and whether last frame's lit scene shows it there
+	const float2 previous_uv = (float2(hit_pixel) + 0.5) / screen + F_SampleLoad(tMotion, int3(hit_pixel, 0)).xy;
+	const float2 history_size = float2(Consts.vLitHistory.xy);
+	const int2 history_texel = clamp(int2(previous_uv * history_size), int2(0, 0), int2(history_size) - 1);
+	const float4 history = F_SampleLoad(tLitHistory, int3(history_texel, 0));
+
+	const float expected = length(hit_position - Consts.vPrevEyePosition.xyz);
+	const bool is_same_surface = and(history.a > 0.0, abs(history.a - expected) <
+														  expected * SCREEN_PROBE_HISTORY_DEPTH_SHARE +
+															  SCREEN_PROBE_HISTORY_DEPTH_BIAS);
+	const bool was_on_screen = all(saturate(previous_uv) == previous_uv);
+
+	out_radiance = history.rgb;
+
+	return select(and(faces_ray, and(was_on_screen, is_same_surface)), SCREEN_TRACE_HIT, SCREEN_TRACE_UNKNOWN);
+}
+
+/// Ray `ray` of a probe: uniform over the hemisphere, stratified 8x8 and jittered per probe and frame. Unit length as
+/// it is: the frame is orthonormal.
+float3 ScreenProbeRayDirection(uint ray, uint seed, float3 tangent, float3 bitangent, float3 normal)
+{
+	const float jitter_u = float(ClipmapHash(seed ^ ray) & 0xFFFFu) / 65536.0;
+	const float jitter_v = float(ClipmapHash(seed ^ (ray * 0x68E31DA4u)) & 0xFFFFu) / 65536.0;
+	const float cos_theta = (float(ray % 8u) + jitter_u) / 8.0;
+	const float v = (float(ray / 8u) + jitter_v) / 8.0;
+
+	const float sin_theta = sqrt(max(1.0 - cos_theta * cos_theta, 0.0));
+	float2 phi_sin_cos;
+	sincos(v * 6.28318530718, phi_sin_cos.x, phi_sin_cos.y);
+
+	return tangent * (phi_sin_cos.y * sin_theta) + bitangent * (phi_sin_cos.x * sin_theta) + normal * cos_theta;
+}
+
+/**
+ * The radiance a ray brings back from the SDF pages: the shaded hit plus the light that bounced before reaching it, or
+ * the clipmap's light at the ray's end where it reaches nothing. `shade_seed` turns the hit's shadow taps.
+ */
+float3 ScreenProbeTraceSDF(float3 origin, float3 direction, uint shade_seed, bool is_clear)
+{
+	const float ray_length = Consts.vParams.x;
+
+	SDFPageHit hit;
+	hit.fDistance = ray_length;
+	hit.uiSteps = 0;
+	hit.uiLevel = 0;
+	hit.uiAtlas = SDF_PAGE_EMPTY;
+	hit.vCoord = int3(0, 0, 0);
+	hit.bHit = false;
+
+	ClipmapProxyHit nearest;
+	nearest.fDistance = ray_length;
+	nearest.vNormal = float3(0.0, 0.0, 0.0);
+	nearest.vAlbedo = float3(0.0, 0.0, 0.0);
+	nearest.bHit = false;
+
+	// A ray the screen showed clear to its end reaches nothing, and only needs the gather below
+	if (!is_clear) {
+		const SDFPageHit coarse_hit = SDFPageTrace(origin, direction, ray_length, Consts.vParams.y);
+		hit = SDFPageRefineHit(coarse_hit, origin, direction, ray_length);
+		nearest.fDistance = select(hit.bHit, hit.fDistance, ray_length);
+
+		[loop]
+		for (uint proxy = 0; proxy < Consts.Base.vInfo.w; proxy++) {
+			ClipmapTraceProxy(Consts.Base.Proxies[proxy], origin, direction, nearest);
+		}
+	}
+
+	const bool is_hit = or(hit.bHit, nearest.bHit);
+	const float3 position = origin + direction * nearest.fDistance;
+
+	float3 face = nearest.vNormal;
+	float3 albedo = nearest.vAlbedo;
+
+	// Skips the triangle loads for misses and box hits
+	if (and(hit.bHit, !nearest.bHit)) {
+		const SDFPageHitRecord record = SDFPageNearestRecord(hit, position);
+		face = SDFPageRecordFace(record, -direction);
+		albedo = SDFPageRecordAlbedo(record);
+	}
+
+	const bool is_backface = dot(face, direction) > 0.0;
+	const float3 normal = select(is_backface, -face, face);
+	const bool is_lit = and(is_hit, !is_backface);
+
+	float3 shaded = float3(0.0, 0.0, 0.0);
+
+	if (is_lit) {
+		const float angle = float(ClipmapHash(shade_seed) & 0xFFFFu) * (6.28318530718 / 65536.0);
+		shaded = SDFPageShadeHit(position, normal, albedo, float2(cos(angle), sin(angle)), Consts.Base.BakedSun,
+								 Consts.Base.vLightIndices, Consts.Base.vLights.x, Consts.Base.vLights.y);
+	}
+
+	// One clipmap gather for hits and misses alike, so a wave with both doesn't run two after each other.
+	// At a hit: the light that bounced before reaching it, the full gather (the cheap bounce gather has no depth
+	// test and no coarser fallback, so near a crease or a wall it settles on the few probes inside it, which
+	// hold black), moved off along the surface's own normal, not towards the probe (often less than the move
+	// away, 0.8 m on the coarsest level, which then went through the wall the probe sits on).
+	// At a miss: the light arriving from beyond, at the ray's end. Its irradiance along the ray over pi is the
+	// mean radiance of the cone of directions around it, weighted to the probes behind the end, the ones the ray
+	// has just come through, which are in open space it reached; the ones ahead may be past a window, outside
+	// the map or beside blockers, and held far too little light.
+	const float3 gather_position = select(is_hit, position, origin + direction * ray_length);
+	const float3 gather_normal = select(is_hit, normal, -direction);
+	const float3 gather_direction = select(is_hit, normal, direction);
+	const ClipmapGatherResult gathered = ClipmapGatherAt(gather_position, gather_normal, gather_normal,
+														 gather_direction, gather_direction, false);
+	const bool in_clipmap = gathered.uiLevel < CLIPMAP_LEVELS;
+
+	// Where no probe holds the end at all, the ray has left: it sees the sky, as a probe's own ray that misses
+	// does. Normalized, those few weights gave whatever the least hidden probe held, often black.
+	const float held = select(in_clipmap, saturate(gathered.fWeight / SCREEN_PROBE_CACHE_WEIGHT), 0.0);
+	const float3 hit_radiance = shaded + select(in_clipmap, albedo * gathered.vDiffuse, float3(0.0, 0.0, 0.0));
+	const float3 miss_radiance = lerp(Consts.Base.vSkyRadiance.rgb, gathered.vDiffuse, held);
+
+	return select(is_hit, select(is_lit, hit_radiance, float3(0.0, 0.0, 0.0)), miss_radiance);
+}
+
 [numthreads(SCREEN_PROBE_RAYS, 1, 1)]
 void main(uint3 group : SV_GroupID, uint ray : SV_GroupIndex)
 {
@@ -169,85 +391,63 @@ void main(uint3 group : SV_GroupID, uint ray : SV_GroupIndex)
 		const float3 tangent = sPlacement[3].xyz;
 		const float3 bitangent = sPlacement[4].xyz;
 
-		// Uniform over the hemisphere, stratified 8x8 and jittered per probe and frame. Unit length as it is: the
-		// frame is orthonormal.
 		const uint seed = ClipmapHash(probe_index * 0x9E3779B9u + asuint(Consts.vParams.z) * 0x85EBCA6Bu);
-		const float jitter_u = float(ClipmapHash(seed ^ ray) & 0xFFFFu) / 65536.0;
-		const float jitter_v = float(ClipmapHash(seed ^ (ray * 0x68E31DA4u)) & 0xFFFFu) / 65536.0;
-		const float u = (float(ray % 8u) + jitter_u) / 8.0;
-		const float v = (float(ray / 8u) + jitter_v) / 8.0;
+		direction = ScreenProbeRayDirection(ray, seed, tangent, bitangent, probe_normal);
 
-		const float cos_theta = u;
-		const float sin_theta = sqrt(max(1.0 - cos_theta * cos_theta, 0.0));
-		float2 phi_sin_cos;
-		sincos(v * 6.28318530718, phi_sin_cos.x, phi_sin_cos.y);
-		direction = tangent * (phi_sin_cos.y * sin_theta) + bitangent * (phi_sin_cos.x * sin_theta) +
-					probe_normal * cos_theta;
+		bool needs_sdf = true;
+		uint screen_state = SCREEN_TRACE_UNKNOWN;
 
-		const float ray_length = Consts.vParams.x;
+PERMIF(SCREEN_PROBE_SCREEN_TRACE);
+		// First through last frame's lit scene: most of these short rays end on a surface that is on screen, and its
+		// light there is already worked out, with every light, its real shadows and its own GI
+		float3 screen_radiance;
+		const float jitter = float(ClipmapHash(seed + ray * 0x2545F491u) & 0xFFFFu) / 65536.0;
+		screen_state = ScreenProbeTraceScreen(origin, direction, Consts.vParams.x, jitter, screen_radiance);
+		needs_sdf = screen_state != SCREEN_TRACE_HIT;
+		radiance = screen_radiance;
+PERMEND();
 
-		const SDFPageHit coarse_hit = SDFPageTrace(origin, direction, ray_length, Consts.vParams.y);
-		const SDFPageHit hit = SDFPageRefineHit(coarse_hit, origin, direction, ray_length);
+		// The rest trace the SDF pages (or for clear rays, only gather at their end), packed onto the first threads so
+		// that whole waves have none and skip it
+		const uint wave = ray / WaveGetLaneCount();
+		const uint wave_offset = WavePrefixCountBits(needs_sdf);
+		// Counted by the whole wave: inside the branch below only its first lane would be
+		const uint wave_sdf_count = WaveActiveCountBits(needs_sdf);
 
-		ClipmapProxyHit nearest;
-		nearest.fDistance = select(hit.bHit, hit.fDistance, ray_length);
-		nearest.vNormal = float3(0.0, 0.0, 0.0);
-		nearest.vAlbedo = float3(0.0, 0.0, 0.0);
-		nearest.bHit = false;
-
-		[loop]
-		for (uint proxy = 0; proxy < Consts.Base.vInfo.w; proxy++) {
-			ClipmapTraceProxy(Consts.Base.Proxies[proxy], origin, direction, nearest);
+		if (WaveIsFirstLane()) {
+			sWaveCounts[wave] = wave_sdf_count;
 		}
 
-		const bool is_hit = or(hit.bHit, nearest.bHit);
-		const float3 position = origin + direction * nearest.fDistance;
+		GroupMemoryBarrierWithGroupSync();
 
-		float3 face = nearest.vNormal;
-		float3 albedo = nearest.vAlbedo;
+		const uint wave_count = (SCREEN_PROBE_RAYS + WaveGetLaneCount() - 1) / WaveGetLaneCount();
+		uint first_slot = 0;
+		uint sdf_count = 0;
 
-		// Skips the triangle loads for misses and box hits
-		if (and(hit.bHit, !nearest.bHit)) {
-			const SDFPageHitRecord record = SDFPageNearestRecord(hit, position);
-			face = SDFPageRecordFace(record, -direction);
-			albedo = SDFPageRecordAlbedo(record);
+		for (uint index = 0; index < wave_count; index++) {
+			first_slot += select(index < wave, sWaveCounts[index], 0u);
+			sdf_count += sWaveCounts[index];
 		}
 
-		const bool is_backface = dot(face, direction) > 0.0;
-		const float3 normal = select(is_backface, -face, face);
-		const bool is_lit = and(is_hit, !is_backface);
-
-		float3 shaded = float3(0.0, 0.0, 0.0);
-
-		if (is_lit) {
-			const float angle = float(ClipmapHash(seed + ray * 0x2545F491u) & 0xFFFFu) * (6.28318530718 / 65536.0);
-			shaded = SDFPageShadeHit(position, normal, albedo, float2(cos(angle), sin(angle)), Consts.Base.BakedSun,
-									 Consts.Base.vLightIndices, Consts.Base.vLights.x, Consts.Base.vLights.y);
+		if (needs_sdf) {
+			sSDFRays[first_slot + wave_offset] = ray | select(screen_state == SCREEN_TRACE_CLEAR, SCREEN_PROBE_CLEAR_BIT, 0u);
 		}
 
-		// One clipmap gather for hits and misses alike, so a wave with both doesn't run two after each other.
-		// At a hit: the light that bounced before reaching it, the full gather (the cheap bounce gather has no depth
-		// test and no coarser fallback, so near a crease or a wall it settles on the few probes inside it, which
-		// hold black), moved off along the surface's own normal, not towards the probe (often less than the move
-		// away, 0.8 m on the coarsest level, which then went through the wall the probe sits on).
-		// At a miss: the light arriving from beyond, at the ray's end. Its irradiance along the ray over pi is the
-		// mean radiance of the cone of directions around it, weighted to the probes behind the end, the ones the ray
-		// has just come through, which are in open space it reached; the ones ahead may be past a window, outside
-		// the map or beside blockers, and held far too little light.
-		const float3 gather_position = select(is_hit, position, origin + direction * ray_length);
-		const float3 gather_normal = select(is_hit, normal, -direction);
-		const float3 gather_direction = select(is_hit, normal, direction);
-		const ClipmapGatherResult gathered = ClipmapGatherAt(gather_position, gather_normal, gather_normal,
-															 gather_direction, gather_direction, false);
-		const bool in_clipmap = gathered.uiLevel < CLIPMAP_LEVELS;
+		GroupMemoryBarrierWithGroupSync();
 
-		// Where no probe holds the end at all, the ray has left: it sees the sky, as a probe's own ray that misses
-		// does. Normalized, those few weights gave whatever the least hidden probe held, often black.
-		const float held = select(in_clipmap, saturate(gathered.fWeight / SCREEN_PROBE_CACHE_WEIGHT), 0.0);
-		const float3 hit_radiance = shaded + select(in_clipmap, albedo * gathered.vDiffuse, float3(0.0, 0.0, 0.0));
-		const float3 miss_radiance = lerp(Consts.Base.vSkyRadiance.rgb, gathered.vDiffuse, held);
+		if (ray < sdf_count) {
+			const uint sdf_entry = sSDFRays[ray];
+			const uint sdf_ray = sdf_entry & ~SCREEN_PROBE_CLEAR_BIT;
+			const bool is_clear = (sdf_entry & SCREEN_PROBE_CLEAR_BIT) != 0u;
+			const float3 sdf_direction = ScreenProbeRayDirection(sdf_ray, seed, tangent, bitangent, probe_normal);
 
-		radiance = select(is_hit, select(is_lit, hit_radiance, float3(0.0, 0.0, 0.0)), miss_radiance);
+			const uint shade_seed = seed + sdf_ray * 0x2545F491u;
+			sSDFRadiance[sdf_ray] = float4(ScreenProbeTraceSDF(origin, sdf_direction, shade_seed, is_clear), 0.0);
+		}
+
+		GroupMemoryBarrierWithGroupSync();
+
+		radiance = select(needs_sdf, sSDFRadiance[ray].rgb, radiance);
 	}
 
 	radiance = select(GIIsFinite(radiance), radiance, float3(0.0, 0.0, 0.0));

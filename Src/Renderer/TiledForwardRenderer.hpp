@@ -233,6 +233,9 @@ public:
 	/// GIResolveIndex is the one the forward pass reads, the last written.
 	RenderStage GIResolvePasses[2];
 	uint32 GIResolveIndex = 0;
+	/// Last frame's lit scene at half resolution, for the screen probes, see ProbeClipmap::CaptureLitHistory. Written
+	/// by a compute pass, never rendered to.
+	RenderStage GILitHistoryPass;
 
 	/* Volumetric Lighting */
 	RenderStage FogApplyPass;

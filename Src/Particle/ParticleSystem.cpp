@@ -1059,13 +1059,16 @@ void ParticleSystem::Render(renderer::CommandBuffer& cmd, const BaseCamera& came
 
 	stage.Begin(cmd);
 
+	const uint32 forward_data_offset = gGraphics->GIClipmap.GetForwardDataFrameOffset(gGraphics->GetFrameNumber());
+
 	gPipelineCache->AddBufferOffset(0, base_offset);
+	gPipelineCache->AddBufferOffset(0, forward_data_offset);
 	gPipelineCache->SetFrameData(world_offset);
 	gPipelineCache->Bind(ePipelineName::Particles, cmd);
 
 	const uint32 buffer_offsets[] = {
 		base_offset,
-		gGraphics->GIClipmap.GetForwardDataFrameOffset(gGraphics->GetFrameNumber()),
+		forward_data_offset,
 	};
 
 	mpDescriptorSet->Bind(0, cmd, pipeline, Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));

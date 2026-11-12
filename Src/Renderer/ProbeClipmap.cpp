@@ -122,9 +122,25 @@ struct ScreenProbeTraceConsts
 	uint32 Screen[4] = {};
 	/// Ray length, cone slope, frame (as bits)
 	float32 Params[4] = {};
+	float32 ViewProjection[16] = {};
+	/// Where the eye was for the lit history
+	float32 PrevEyePosition[4] = {};
+	/// The lit history's width and height
+	uint32 LitHistory[4] = {};
 };
 
 static_assert(sizeof(ScreenProbeTraceConsts) <= FrameAllocator::scMaxAllocationSize);
+
+/// Mirrors ScreenProbeLitHistoryConsts in Shaders/ScreenProbeLitHistory.hlsl
+struct ScreenProbeLitHistoryConsts
+{
+	float32 InvViewProjection[16] = {};
+	float32 EyePosition[4] = {};
+	/// Full resolution width and height, then the history's
+	uint32 Size[4] = {};
+	/// One over the pre-exposure
+	float32 Params[4] = {};
+};
 
 /// Mirrors ScreenProbeFilterConsts in Shaders/ScreenProbeFilter.hlsl
 struct ScreenProbeFilterConsts
@@ -298,7 +314,7 @@ void ProbeClipmap::Destroy()
 	mFilteredScreenProbes.Destroy();
 }
 
-void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
+void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit, Target* motion, Target* lit_history)
 {
 	SDFPageScene& pages = gGraphics->SDFPages;
 
@@ -390,43 +406,60 @@ void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
 
-	// Screen probes: the trace's bindings, the prepass and the probe output
-	gPSOBuild->BeginPipeline(ePipelineName::ScreenProbeTrace);
-	gPSOBuild->SetShader(eShaderName::ScreenProbeTrace, {});
-	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, pages.GetIndirectionBuffer(), 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddImage(1, 0, eShaderType::Compute, pages.GetAtlas(), linear_sampler);
-	gPSOBuild->AddBuffer(2, 0, eShaderType::Compute, pages.GetHitRecordBuffer(), 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddBuffer(3, 0, eShaderType::Compute, pages.GetRefBuffer(), 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddBuffer(4, 0, eShaderType::Compute, pages.GetAtlasFirstRefBuffer(), 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddImage(5, 0, eShaderType::Compute, pages.GetNearest(), point_sampler);
-	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-						 gGraphics->LightBuffer.PageSize);
-	gPSOBuild->AddImageFromTarget(7, 0, eShaderType::Compute, gShadowAtlas->GetTarget(),
-								  gSamplerCache->Request({
-									  eSamplerFilter::Linear,
-									  eSamplerFilter::Linear,
-									  eSamplerFilter::Linear,
-									  eSamplerAddressMode::ClampToBorder,
-									  eSamplerBorderColor::FloatWhite,
-									  eSamplerCompareOp::Greater,
-								  }));
-	gPSOBuild->AddImage(8, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas,
-						gSamplerCache->Request({
-							eSamplerFilter::Linear,
-							eSamplerFilter::Linear,
-							eSamplerFilter::Nearest,
-							eSamplerAddressMode::ClampToEdge,
-							eSamplerBorderColor::FloatWhite,
-							eSamplerCompareOp::LessOrEqual,
-						}));
-	gPSOBuild->AddBuffer(9, 0, eShaderType::Compute, &gGraphics->FogShadowPageBuffer, 0,
-						 gGraphics->FogShadowPageBufferSize);
-	gPSOBuild->AddImage(12, 0, eShaderType::Compute, mpIrradiance, linear_sampler);
-	gPSOBuild->AddImage(15, 0, eShaderType::Compute, mpMoments, linear_sampler);
-	gPSOBuild->AddBuffer(19, 0, eShaderType::Compute, &mProbes, 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddImageFromTarget(20, 0, eShaderType::Compute, depth, point_sampler);
-	gPSOBuild->AddImageFromTarget(21, 0, eShaderType::Compute, normals, point_sampler);
-	gPSOBuild->AddBuffer(22, 0, eShaderType::Compute, &mScreenProbes, 0, VK_WHOLE_SIZE);
+	// Screen probes: the trace's bindings, the prepass, the probe output and last frame's lit scene
+	const auto build_screen_trace = [&](ePipelineName name, const SizedArray<ShaderMacro>& macros)
+	{
+		gPSOBuild->BeginPipeline(name);
+		gPSOBuild->SetShader(eShaderName::ScreenProbeTrace, macros);
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, pages.GetIndirectionBuffer(), 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddImage(1, 0, eShaderType::Compute, pages.GetAtlas(), linear_sampler);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Compute, pages.GetHitRecordBuffer(), 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Compute, pages.GetRefBuffer(), 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddBuffer(4, 0, eShaderType::Compute, pages.GetAtlasFirstRefBuffer(), 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddImage(5, 0, eShaderType::Compute, pages.GetNearest(), point_sampler);
+		gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
+		gPSOBuild->AddImageFromTarget(7, 0, eShaderType::Compute, gShadowAtlas->GetTarget(),
+									  gSamplerCache->Request({
+										  eSamplerFilter::Linear,
+										  eSamplerFilter::Linear,
+										  eSamplerFilter::Linear,
+										  eSamplerAddressMode::ClampToBorder,
+										  eSamplerBorderColor::FloatWhite,
+										  eSamplerCompareOp::Greater,
+									  }));
+		gPSOBuild->AddImage(8, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas,
+							gSamplerCache->Request({
+								eSamplerFilter::Linear,
+								eSamplerFilter::Linear,
+								eSamplerFilter::Nearest,
+								eSamplerAddressMode::ClampToEdge,
+								eSamplerBorderColor::FloatWhite,
+								eSamplerCompareOp::LessOrEqual,
+							}));
+		gPSOBuild->AddBuffer(9, 0, eShaderType::Compute, &gGraphics->FogShadowPageBuffer, 0,
+							 gGraphics->FogShadowPageBufferSize);
+		gPSOBuild->AddImage(12, 0, eShaderType::Compute, mpIrradiance, linear_sampler);
+		gPSOBuild->AddImage(15, 0, eShaderType::Compute, mpMoments, linear_sampler);
+		gPSOBuild->AddBuffer(19, 0, eShaderType::Compute, &mProbes, 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddImageFromTarget(20, 0, eShaderType::Compute, depth, point_sampler);
+		gPSOBuild->AddImageFromTarget(21, 0, eShaderType::Compute, normals, point_sampler);
+		gPSOBuild->AddBuffer(22, 0, eShaderType::Compute, &mScreenProbes, 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddImageFromTarget(23, 0, eShaderType::Compute, motion, point_sampler);
+		gPSOBuild->AddImageFromTarget(24, 0, eShaderType::Compute, lit_history, point_sampler);
+		gPSOBuild->AddFrameData(1);
+		gPSOBuild->EndPipeline();
+	};
+
+	build_screen_trace(ePipelineName::ScreenProbeTrace, {});
+	build_screen_trace(ePipelineName::ScreenProbeTraceScreen,
+					   { ShaderMacro { .pcName = "SCREEN_PROBE_SCREEN_TRACE", .pcValue = "1" } });
+
+	gPSOBuild->BeginPipeline(ePipelineName::ScreenProbeLitHistory);
+	gPSOBuild->SetShader(eShaderName::ScreenProbeLitHistory, {});
+	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Compute, lit, point_sampler);
+	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Compute, depth, point_sampler);
+	gPSOBuild->AddStorageImage(2, 0, eShaderType::Compute, &lit_history->GetImage());
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
 
@@ -458,6 +491,7 @@ void ProbeClipmap::Reset()
 	mTrackedProxies.Clear();
 	mbHasTrackedProxies = false;
 	mbClearProbes = true;
+	mbLitHistoryValid = false;
 }
 
 void ProbeClipmap::SetProbeMask(const CompiledMapProbeMask& mask)
@@ -1323,6 +1357,21 @@ void ProbeClipmap::TraceScreenProbes(CommandBuffer& cmd, const BaseCamera& camer
 	trace.Params[0] = ScreenProbeRayLength;
 	trace.Params[1] = ScreenProbeCone;
 
+	const FMat4 view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+	memcpy(trace.ViewProjection, view_projection.RawData, sizeof(FMat4));
+	trace.PrevEyePosition[0] = mLitHistoryEye.X;
+	trace.PrevEyePosition[1] = mLitHistoryEye.Y;
+	trace.PrevEyePosition[2] = mLitHistoryEye.Z;
+	trace.LitHistory[0] = mLitHistorySize.X;
+	trace.LitHistory[1] = mLitHistorySize.Y;
+
+	// The lit history is only there from the second frame on, and after a resize or a new map
+	ePipelineName trace_pipeline = ePipelineName::ScreenProbeTrace;
+
+	if (bScreenProbeScreenTrace && mbLitHistoryValid) {
+		trace_pipeline = ePipelineName::ScreenProbeTraceScreen;
+	}
+
 	const uint32 frame_bits = gGraphics->GetElapsedFrameCount();
 	memcpy(&trace.Params[2], &frame_bits, sizeof(frame_bits));
 
@@ -1339,7 +1388,7 @@ void ProbeClipmap::TraceScreenProbes(CommandBuffer& cmd, const BaseCamera& camer
 		gPipelineCache->AddBufferOffset(0, 0);
 		gPipelineCache->AddBufferOffset(0, 0);
 		gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(trace));
-		gPipelineCache->Bind(ePipelineName::ScreenProbeTrace, cmd);
+		gPipelineCache->Bind(trace_pipeline, cmd);
 
 		vkCmdDispatch(cmd.Get(), tiles_x, tiles_y, 1);
 	}
@@ -1362,6 +1411,40 @@ void ProbeClipmap::TraceScreenProbes(CommandBuffer& cmd, const BaseCamera& camer
 	vkCmdDispatch(cmd.Get(), (tiles_x + 7) / 8, (tiles_y + 7) / 8, 1);
 
 	BarrierHelper::BufferComputeToFragment(cmd, &mFilteredScreenProbes);
+}
+
+void ProbeClipmap::CaptureLitHistory(CommandBuffer& cmd, const BaseCamera& camera, Image* lit_history)
+{
+	const FMat4 inverse = camera.GetCameraMatrix(eObjectLayer::WorldLayer).Inverse();
+	const FVec3 eye = camera.GetPosition();
+	const UVec2 full_size = gGraphics->pRenderer->Prepass.GetTarget(eImageFormat::D32_Float)->Image.Info.Size;
+	const UVec2 history_size = lit_history->Info.Size;
+
+	ScreenProbeLitHistoryConsts consts;
+	memcpy(consts.InvViewProjection, inverse.RawData, sizeof(FMat4));
+	consts.EyePosition[0] = eye.X;
+	consts.EyePosition[1] = eye.Y;
+	consts.EyePosition[2] = eye.Z;
+	consts.EyePosition[3] = 1.0f;
+	consts.Size[0] = full_size.X;
+	consts.Size[1] = full_size.Y;
+	consts.Size[2] = history_size.X;
+	consts.Size[3] = history_size.Y;
+	consts.Params[0] = 1.0f / std::max(gGraphics->PreExposure, 1e-12f);
+
+	// After the forward pass's writes, before the particles' (the barriers wait on everything)
+	ImageBarrier(cmd, lit_history, lit_history->ImageLayout, VK_IMAGE_LAYOUT_GENERAL);
+
+	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
+	gPipelineCache->Bind(ePipelineName::ScreenProbeLitHistory, cmd);
+
+	vkCmdDispatch(cmd.Get(), (history_size.X + 7) / 8, (history_size.Y + 7) / 8, 1);
+
+	ImageBarrier(cmd, lit_history, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+	mbLitHistoryValid = true;
+	mLitHistoryEye = eye;
+	mLitHistorySize = history_size;
 }
 
 void ProbeClipmap::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebugView view)

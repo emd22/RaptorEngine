@@ -59,9 +59,10 @@ void TiledForwardRenderer::Create(const UVec2& extent)
 	gGraphics->SDFPages.CreatePipelines(
 		Prepass.GetTarget(eImageFormat::D32_Float), Prepass.GetTarget(eImageFormat::RGBA16_Float),
 		Prepass.GetTarget(eImageFormat::RG16_Float), ForwardPass.GetTarget(eImageFormat::RGBA16_Float));
-	gGraphics->GIClipmap.CreatePipelines(Prepass.GetTarget(eImageFormat::D32_Float),
-										 Prepass.GetTarget(eImageFormat::RGBA16_Float),
-										 ForwardPass.GetTarget(eImageFormat::RGBA16_Float));
+	gGraphics->GIClipmap.CreatePipelines(
+		Prepass.GetTarget(eImageFormat::D32_Float), Prepass.GetTarget(eImageFormat::RGBA16_Float),
+		ForwardPass.GetTarget(eImageFormat::RGBA16_Float), Prepass.GetTarget(eImageFormat::RG16_Float),
+		GILitHistoryPass.GetTarget(eImageFormat::RGBA16_Float));
 	CreateLightCullingPSO();
 	CreateDebugLayerPSO();
 	CreateDebugSolidPSO();
@@ -450,6 +451,11 @@ void TiledForwardRenderer::CreateGIResolvePSO()
 		stage.AddTarget(eImageFormat::RG32_UInt, scUsage, eImageAspectFlag::Color);
 		stage.BuildRenderStage();
 	}
+
+	GILitHistoryPass.Create("GILitHistory", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
+	GILitHistoryPass.AddTarget(eImageFormat::RGBA16_Float, scUsage | VK_IMAGE_USAGE_STORAGE_BIT,
+							   eImageAspectFlag::Color);
+	GILitHistoryPass.BuildRenderStage();
 
 	ProbeClipmap& clipmap = gGraphics->GIClipmap;
 

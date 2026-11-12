@@ -24,7 +24,8 @@ static const PipelineNameInfo scNameInfos[] = {
 	NAME_INFO("ProbeClipmapResolveHistory"), NAME_INFO("ProbeClipmapResolveScreenProbesHistory"),
 	NAME_INFO("ProbeClipmapResolveB"), NAME_INFO("ProbeClipmapResolveScreenProbesB"),
 	NAME_INFO("ProbeClipmapResolveHistoryB"), NAME_INFO("ProbeClipmapResolveScreenProbesHistoryB"),
-	NAME_INFO("ScreenProbeTrace"), NAME_INFO("ScreenProbeFilter"),
+	NAME_INFO("ScreenProbeTrace"), NAME_INFO("ScreenProbeTraceScreen"), NAME_INFO("ScreenProbeFilter"),
+	NAME_INFO("ScreenProbeLitHistory"),
 };
 
 static_assert(std::size(scNameInfos) == static_cast<uint32>(ePipelineName::NumPipelines));

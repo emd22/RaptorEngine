@@ -54,6 +54,7 @@ void World::Create()
 	pCVarScreenProbes = gCVars->Set<int64>("r_gi_screen_probes", 1);
 	pCVarGITemporal = gCVars->Set<int64>("r_gi_temporal", 1);
 	pCVarSPAlpha = gCVars->Set<float32>("r_gi_sp_alpha", 0.1f);
+	pCVarSPScreenTrace = gCVars->Set<int64>("r_gi_sp_screen_trace", 1);
 	pCVarGIProbeBudget = gCVars->Set<int64>("r_gi_probe_budget", 3072);
 	pCVarGIHysteresis = gCVars->Set<float32>("r_gi_hysteresis", 0.97f);
 	pCVarGIBounce = gCVars->Set<int64>("r_gi_bounce", 1);
@@ -1310,6 +1311,7 @@ void World::Render(BaseCamera* shadow_camera)
 		gGraphics->bGIScreenProbes = (pCVarScreenProbes->IntValue != 0);
 		gGraphics->bGITemporal = (pCVarGITemporal->IntValue != 0);
 		gGraphics->GIScreenProbeAlpha = pCVarSPAlpha->FloatValue;
+		gGraphics->GIClipmap.bScreenProbeScreenTrace = (pCVarSPScreenTrace->IntValue != 0);
 	}
 
 	const int64 sdf_page_view = pCVarSDFPageDebug->IntValue;

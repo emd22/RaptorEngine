@@ -331,6 +331,8 @@ void GraphicsBackend::RebuildRenderStages()
 	rd->SSAOBlurPass.Rebuild(size);
 	rd->GIResolvePasses[0].Rebuild(size);
 	rd->GIResolvePasses[1].Rebuild(size);
+	rd->GILitHistoryPass.Rebuild(size);
+	GIClipmap.InvalidateLitHistory();
 	mbGIHistoryValid = false;
 	rd->CompPass.Rebuild(size);
 
@@ -1431,6 +1433,16 @@ void GraphicsBackend::DoComposition(PerspectiveCamera& render_cam)
 	forward_stage->End();
 	mpActiveForwardStage = nullptr;
 	MarkGpu(eGpuMarker::Forward);
+
+	// The lit scene before the particles and the fog, which the next frame's screen probes read. Without it they
+	// trace the SDF pages alone, and a history from frames ago is never used.
+	if (bGIScreenProbes && GIClipmap.bScreenProbeScreenTrace && GIClipmap.IsReady()) {
+		GIClipmap.CaptureLitHistory(frame->CmdBuffer, render_cam,
+									&pRenderer->GILitHistoryPass.GetTarget(eImageFormat::RGBA16_Float)->Image);
+	}
+	else {
+		GIClipmap.InvalidateLitHistory();
+	}
 
 	gParticleSystem->Render(frame->CmdBuffer, render_cam, pRenderer->ParticlePass);
 	MarkGpu(eGpuMarker::Particles);
